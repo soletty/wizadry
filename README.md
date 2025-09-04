@@ -4,10 +4,32 @@ Automate code review workflows using Claude Code sub-agents with structured hand
 
 ## Quick Start
 
+### Option 1: Web UI (Recommended) 🎉 NEW!
 ```bash
 # Install
 pip install -e .
 
+# Launch the web interface
+wizardry ui
+
+# Open browser to http://localhost:8501
+# Create workflows through the intuitive web interface
+```
+
+### Option 2: Command Line
+```bash
+# Install
+pip install -e .
+
+# Setup a repository for workflows
+wizardry setup --repo /path/to/your/repo
+
+# Start workflow directly from CLI
+wizardry run --repo /path/to/your/repo --branch main --task "Fix email validation bug"
+```
+
+### Option 3: Classic Claude Code (Legacy)
+```bash
 # Setup a repository for workflows
 wizardry setup --repo /path/to/your/repo
 
@@ -33,7 +55,12 @@ claude
 
 ## Commands
 
+### Web UI
+- `wizardry ui` - Launch the web interface (recommended)
+
+### CLI Commands
 - `wizardry setup --repo <path>` - Enable a repo for workflows
+- `wizardry run --repo <path> --branch <branch> --task "<task>"` - Run workflow directly
 - `wizardry status` - Check repo setup and active workflows  
 - `wizardry sessions` - List all active sessions
 - `wizardry transcripts <session-id>` - View session logs

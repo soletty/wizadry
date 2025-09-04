@@ -224,6 +224,57 @@ def kill(session_id: str):
 
 
 @cli.command()
+@click.option('--port', default=8501, help='Port to run the UI on (default: 8501)')
+def ui(port: int):
+    """Launch the Wizardry web UI."""
+    import os
+    import subprocess
+    
+    # Get the UI directory
+    ui_dir = Path(__file__).parent.parent / "ui"
+    
+    if not ui_dir.exists():
+        rprint(f"[red]Error: UI directory not found at {ui_dir}[/red]")
+        rprint("The web UI may not be installed correctly.")
+        sys.exit(1)
+    
+    app_file = ui_dir / "app.py"
+    if not app_file.exists():
+        rprint(f"[red]Error: UI app file not found at {app_file}[/red]")
+        sys.exit(1)
+    
+    rprint(f"[bold]🧙‍♂️ Launching Wizardry UI on port {port}...[/bold]")
+    rprint(f"[dim]Open your browser to: http://localhost:{port}[/dim]")
+    rprint(f"[dim]Press Ctrl+C to stop the server[/dim]")
+    rprint("")
+    
+    try:
+        # Check if streamlit is available
+        subprocess.run(["streamlit", "--version"], capture_output=True, check=True)
+        
+        # Launch streamlit
+        subprocess.run([
+            "streamlit", "run", str(app_file),
+            "--server.port", str(port),
+            "--server.address", "localhost",
+            "--server.headless", "false",
+            "--browser.gatherUsageStats", "false",
+            "--theme.base", "light",
+            "--theme.primaryColor", "#1f77b4"
+        ], cwd=ui_dir)
+        
+    except subprocess.CalledProcessError:
+        rprint("[red]❌ Streamlit not found. Please install it:[/red]")
+        rprint("pip install streamlit>=1.28.0")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        rprint("\n[green]✅ Wizardry UI stopped[/green]")
+    except Exception as e:
+        rprint(f"[red]❌ Error launching UI: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
 @click.option('--repo', default='.', help='Path to repository (defaults to current directory)')
 @click.option('--branch', required=True, help='Base branch to work from')
 @click.option('--task', required=True, help='Task description for agents to implement')
