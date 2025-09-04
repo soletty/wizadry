@@ -224,11 +224,14 @@ def kill(session_id: str):
 
 
 @cli.command()
-@click.option('--port', default=8501, help='Port to run the UI on (default: 8501)')
-def ui(port: int):
-    """Launch the Wizardry web UI."""
+@click.option('--port', default=3000, help='Port to run the frontend on (default: 3000)')
+@click.option('--api-port', default=8000, help='Port to run the API on (default: 8000)')
+def ui(port: int, api_port: int):
+    """Launch the Wizardry web UI (TypeScript/Next.js)."""
     import os
     import subprocess
+    import threading
+    import time
     
     # Get the UI directory
     ui_dir = Path(__file__).parent.parent / "ui"
@@ -238,35 +241,68 @@ def ui(port: int):
         rprint("The web UI may not be installed correctly.")
         sys.exit(1)
     
-    app_file = ui_dir / "app.py"
-    if not app_file.exists():
-        rprint(f"[red]Error: UI app file not found at {app_file}[/red]")
+    backend_dir = ui_dir / "backend"
+    frontend_dir = ui_dir / "frontend"
+    
+    if not backend_dir.exists() or not frontend_dir.exists():
+        rprint(f"[red]Error: UI components not found[/red]")
+        rprint("Run 'cd wizardry/ui/frontend && npm install' to setup the frontend")
         sys.exit(1)
     
-    rprint(f"[bold]🧙‍♂️ Launching Wizardry UI on port {port}...[/bold]")
-    rprint(f"[dim]Open your browser to: http://localhost:{port}[/dim]")
-    rprint(f"[dim]Press Ctrl+C to stop the server[/dim]")
+    rprint(f"[bold]🧙‍♂️ Launching Wizardry UI...[/bold]")
+    rprint(f"[dim]API Server: http://localhost:{api_port}[/dim]")
+    rprint(f"[dim]Web Interface: http://localhost:{port}[/dim]")
+    rprint(f"[dim]Press Ctrl+C to stop both servers[/dim]")
     rprint("")
     
+    def start_backend():
+        """Start the FastAPI backend server."""
+        try:
+            rprint("[blue]🔧 Starting API server...[/blue]")
+            subprocess.run([
+                "uvicorn", "main:app",
+                "--host", "0.0.0.0",
+                "--port", str(api_port),
+                "--reload"
+            ], cwd=backend_dir)
+        except Exception as e:
+            rprint(f"[red]❌ Backend error: {e}[/red]")
+    
+    def start_frontend():
+        """Start the Next.js frontend server."""
+        try:
+            time.sleep(2)  # Give backend time to start
+            rprint("[blue]🎨 Starting frontend server...[/blue]")
+            subprocess.run([
+                "npm", "run", "dev",
+                "--", "--port", str(port)
+            ], cwd=frontend_dir)
+        except Exception as e:
+            rprint(f"[red]❌ Frontend error: {e}[/red]")
+    
     try:
-        # Check if streamlit is available
-        subprocess.run(["streamlit", "--version"], capture_output=True, check=True)
+        # Check if required dependencies are available
+        try:
+            subprocess.run(["uvicorn", "--version"], capture_output=True, check=True)
+        except subprocess.CalledProcessError:
+            rprint("[red]❌ uvicorn not found. Please install it:[/red]")
+            rprint("pip install uvicorn[standard]")
+            sys.exit(1)
         
-        # Launch streamlit
-        subprocess.run([
-            "streamlit", "run", str(app_file),
-            "--server.port", str(port),
-            "--server.address", "localhost",
-            "--server.headless", "false",
-            "--browser.gatherUsageStats", "false",
-            "--theme.base", "light",
-            "--theme.primaryColor", "#1f77b4"
-        ], cwd=ui_dir)
+        # Check if npm is available
+        try:
+            subprocess.run(["npm", "--version"], capture_output=True, check=True)
+        except subprocess.CalledProcessError:
+            rprint("[red]❌ npm not found. Please install Node.js first.[/red]")
+            sys.exit(1)
         
-    except subprocess.CalledProcessError:
-        rprint("[red]❌ Streamlit not found. Please install it:[/red]")
-        rprint("pip install streamlit>=1.28.0")
-        sys.exit(1)
+        # Start backend in a separate thread
+        backend_thread = threading.Thread(target=start_backend, daemon=True)
+        backend_thread.start()
+        
+        # Start frontend in main thread (so Ctrl+C works properly)
+        start_frontend()
+        
     except KeyboardInterrupt:
         rprint("\n[green]✅ Wizardry UI stopped[/green]")
     except Exception as e:

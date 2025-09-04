@@ -4,16 +4,16 @@ Automate code review workflows using Claude Code sub-agents with structured hand
 
 ## Quick Start
 
-### Option 1: Web UI (Recommended) 🎉 NEW!
+### Option 1: Modern Web UI (Recommended) ✨ NEW!
 ```bash
-# Install
-pip install -e .
+# Setup (first time only)
+./wizardry/ui/setup.sh
 
 # Launch the web interface
 wizardry ui
 
-# Open browser to http://localhost:8501
-# Create workflows through the intuitive web interface
+# Open browser to http://localhost:3000
+# Beautiful TypeScript/Next.js interface for managing workflows
 ```
 
 ### Option 2: Command Line
@@ -56,7 +56,8 @@ claude
 ## Commands
 
 ### Web UI
-- `wizardry ui` - Launch the web interface (recommended)
+- `wizardry ui` - Launch the modern TypeScript/Next.js web interface (recommended)
+- `wizardry ui --port 3001 --api-port 8001` - Launch on custom ports
 
 ### CLI Commands
 - `wizardry setup --repo <path>` - Enable a repo for workflows

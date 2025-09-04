@@ -1,1 +1,0 @@
-"""Wizardry UI components package."""
