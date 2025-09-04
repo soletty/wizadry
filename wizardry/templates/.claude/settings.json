@@ -1,0 +1,28 @@
+{
+  "subagents": {
+    "implementer": "./agents/implementer.json",
+    "reviewer": "./agents/reviewer.json"
+  },
+  "hooks": {
+    "user_prompt_submit": {
+      "command": "bash .claude/hooks/transcript_logger.sh $PROMPT",
+      "description": "Log user prompts for transcript debugging"
+    },
+    "pre_tool_use": {
+      "command": "bash .claude/hooks/pre_tool.sh $TOOL_NAME $TOOL_ARGS",
+      "description": "Prepare for tool usage, handle workflow coordination"
+    },
+    "post_tool_use": {
+      "command": "bash .claude/hooks/post_tool.sh $TOOL_NAME $TOOL_RESULT",
+      "description": "Handle agent coordination after tool usage"
+    }
+  },
+  "env": {
+    "WIZARDRY_WORKSPACE": "/tmp/wizardry-sessions",
+    "WIZARDRY_MAX_ITERATIONS": "2"
+  },
+  "permissions": {
+    "allowedTools": ["*"],
+    "permissionMode": "allow"
+  }
+}
