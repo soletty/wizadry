@@ -45,36 +45,85 @@ class WorkflowOrchestrator:
         self.reviewer_prompt = self._load_reviewer_prompt()
         
     def _setup_workspace_repo(self) -> Path:
-        """Create a workspace copy of the target repo for Conductor isolation."""
-        import shutil
-        import os
+        """Create a workspace using git worktrees for isolation."""
+        import subprocess
         
         # Check if we're running in a Conductor workspace
         current_cwd = Path.cwd()
         conductor_workspace = "/Users/solal/Documents/GitHub/wizadry/.conductor/"
         
         if str(current_cwd).startswith(conductor_workspace):
-            # Running in Conductor - create workspace copy
+            # Running in Conductor - create isolated worktree
             workspace_repo = self.session_dir / "workspace_repo"
+            worktree_branch = f"wizardry-{self.workflow_id}"
             
-            # Clone the original repo to workspace
-            console.print(f"🔄 Setting up workspace copy of {self.original_repo_path}")
+            console.print(f"🔄 Setting up git worktree for {self.original_repo_path}")
             try:
-                # Use git clone to copy the repo while preserving git history
-                import subprocess
+                # Create worktree with new branch from base branch
                 result = subprocess.run([
-                    "git", "clone", str(self.original_repo_path), str(workspace_repo)
+                    "git", "-C", str(self.original_repo_path), 
+                    "worktree", "add", "-b", worktree_branch, 
+                    str(workspace_repo), self.base_branch
                 ], check=True, capture_output=True, text=True)
                 
-                console.print(f"✅ Workspace repo created at {workspace_repo}")
+                console.print(f"✅ Git worktree created at {workspace_repo}")
+                console.print(f"🌿 Branch: {worktree_branch} (from {self.base_branch})")
                 return workspace_repo
                 
             except subprocess.CalledProcessError as e:
-                console.print(f"❌ Failed to clone repo: {e.stderr}")
-                # Fallback: use the original path and hope for the best
-                return self.original_repo_path
+                console.print(f"❌ Failed to create worktree: {e.stderr}")
+                # Fallback: try without branch creation (branch might exist)
+                try:
+                    result = subprocess.run([
+                        "git", "-C", str(self.original_repo_path),
+                        "worktree", "add", str(workspace_repo), worktree_branch
+                    ], check=True, capture_output=True, text=True)
+                    console.print(f"✅ Git worktree created using existing branch")
+                    return workspace_repo
+                except subprocess.CalledProcessError as e2:
+                    console.print(f"❌ Worktree fallback failed: {e2.stderr}")
+                    # Last fallback: use clone method
+                    return self._fallback_clone_method()
         else:
-            # Not in Conductor - use original path
+            # Not in Conductor - use original path but still create worktree for isolation
+            return self._setup_local_worktree()
+    
+    def _fallback_clone_method(self) -> Path:
+        """Fallback to clone method if worktrees fail."""
+        workspace_repo = self.session_dir / "workspace_repo"
+        console.print("🔄 Falling back to clone method...")
+        
+        try:
+            import subprocess
+            result = subprocess.run([
+                "git", "clone", str(self.original_repo_path), str(workspace_repo)
+            ], check=True, capture_output=True, text=True)
+            
+            console.print(f"✅ Workspace repo cloned to {workspace_repo}")
+            return workspace_repo
+        except subprocess.CalledProcessError as e:
+            console.print(f"❌ Clone fallback failed: {e.stderr}")
+            return self.original_repo_path
+    
+    def _setup_local_worktree(self) -> Path:
+        """Setup worktree even when not in Conductor for isolation."""
+        import subprocess
+        
+        workspace_repo = self.session_dir / "workspace_repo"
+        worktree_branch = f"wizardry-{self.workflow_id}"
+        
+        try:
+            # Create worktree in session directory
+            result = subprocess.run([
+                "git", "-C", str(self.original_repo_path),
+                "worktree", "add", "-b", worktree_branch,
+                str(workspace_repo), self.base_branch
+            ], check=True, capture_output=True, text=True)
+            
+            console.print(f"✅ Local worktree created at {workspace_repo}")
+            return workspace_repo
+        except subprocess.CalledProcessError as e:
+            console.print(f"⚠️ Worktree creation failed, using original repo: {e.stderr}")
             return self.original_repo_path
     
     def _generate_workflow_id(self) -> str:
@@ -315,7 +364,7 @@ Focus on issues that matter - good enough to ship, not perfect."""
         
         options = ClaudeCodeOptions(
             system_prompt=self.implementer_prompt,
-            max_turns=10,
+            max_turns=35,  # Increased to allow more complex implementations
             allowed_tools=["Read", "Write", "Edit", "Bash", "Grep", "LS", "MultiEdit"],
             model="claude-3-5-sonnet-20241022",
             cwd=str(self.repo_path),  # Set working directory to repo
@@ -385,7 +434,7 @@ Follow the guidelines in your system prompt and make sure to:
         
         options = ClaudeCodeOptions(
             system_prompt=self.implementer_prompt,
-            max_turns=10,
+            max_turns=35,  # Increased to allow more complex implementations  
             allowed_tools=["Read", "Write", "Edit", "Bash", "Grep", "LS", "MultiEdit"],
             model="claude-3-5-sonnet-20241022",
             cwd=str(self.repo_path),
@@ -701,30 +750,30 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
         except Exception as e:
             console.print(f"⚠️ Error during repo sync: {e}")
     
-    def _create_isolated_workspace(self) -> str:
-        """Create an isolated branch for the workflow."""
+    def _cleanup_worktree(self):
+        """Clean up the git worktree after workflow completion."""
+        if self.repo_path == self.original_repo_path:
+            return  # No worktree to clean up
+            
         try:
-            # Switch to base branch first
-            self.repo.git.checkout(self.base_branch)
+            import subprocess
+            worktree_branch = f"wizardry-{self.workflow_id}"
             
-            # Create isolated branch
-            isolated_branch = f"wizardry-{self.workflow_id}"
+            # Remove worktree
+            result = subprocess.run([
+                "git", "-C", str(self.original_repo_path),
+                "worktree", "remove", str(self.repo_path)
+            ], check=True, capture_output=True, text=True)
             
-            # Check if branch exists and delete it if it does
-            if isolated_branch in [b.name for b in self.repo.branches]:
-                console.print(f"🔄 Cleaning up existing branch: {isolated_branch}")
-                self.repo.git.branch('-D', isolated_branch)
-                
-            # Create new isolated branch
-            self.repo.git.checkout('-b', isolated_branch)
-            console.print(f"🌟 Created isolated branch: {isolated_branch}")
+            console.print(f"🧹 Cleaned up worktree: {self.repo_path}")
             
-            return isolated_branch
+            # Optionally remove the branch (but keep it for reference)
+            # subprocess.run(["git", "-C", str(self.original_repo_path), "branch", "-D", worktree_branch])
             
+        except subprocess.CalledProcessError as e:
+            console.print(f"⚠️ Failed to clean up worktree: {e.stderr}")
         except Exception as e:
-            console.print(f"❌ Failed to create isolated workspace: {e}")
-            # Fallback to using base branch
-            return self.base_branch
+            console.print(f"⚠️ Error during worktree cleanup: {e}")
     
     @staticmethod
     def archive_session(session_id: str, cleanup_branch: bool = True) -> bool:
@@ -822,8 +871,7 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
         console.print(f"🌿 Base branch: {self.base_branch}")
         
         try:
-            # Setup isolated workspace
-            isolated_branch = self._create_isolated_workspace()
+            # Workspace already set up by _setup_workspace_repo() in constructor
             self._register_session()
             
             # Run implementer
@@ -892,6 +940,9 @@ Please fix these issues and commit your changes. Make sure to:
                 # Create PR
                 pr_url = self._create_pr()
                 
+                # Clean up worktree
+                self._cleanup_worktree()
+                
                 console.print("🎉 Workflow completed successfully!")
                 success = True
             else:
@@ -902,6 +953,10 @@ Please fix these issues and commit your changes. Make sure to:
             console.print(f"❌ Workflow error: {e}")
             success = False
         finally:
+            # Always clean up worktree, even on failure
+            if not success:
+                self._cleanup_worktree()
+                
             # Update session status based on actual result
             status = "completed" if success else "failed"
             self._update_session_status(status)
