@@ -434,7 +434,7 @@ Please review this implementation:
 
 **Git Diff**:
 ```diff
-{diff_output}
+{diff_content_for_prompt}
 ```
 
 **Instructions**: 
@@ -454,10 +454,33 @@ Analyze for:
 Provide your structured JSON review - be concise and actionable.
 """
         
-        # Log diff size but don't truncate - let reviewer handle the full context
-        console.print(f"📋 Sending review prompt with diff length: {len(diff_output)} characters")
+        # Handle large diffs by saving to file
+        console.print(f"📋 Preparing review with diff length: {len(diff_output)} characters")
+        
+        diff_file_path = None
+        diff_content_for_prompt = diff_output
+        
+        # If diff is large (>10KB), save to file and tell reviewer to read it
         if len(diff_output) > 10000:
-            console.print("📋 Large diff - reviewer will focus on key changes")
+            console.print("📋 Large diff detected - saving to temp file for reviewer")
+            try:
+                # Save diff to temp file in session directory
+                diff_file_path = self.session_dir / "current_diff.txt"
+                with open(diff_file_path, 'w') as f:
+                    f.write(diff_output)
+                console.print(f"📁 Saved diff to: {diff_file_path}")
+                
+                # Replace diff content in prompt with file reference
+                diff_content_for_prompt = f"[DIFF TOO LARGE - {len(diff_output)} chars]
+Please use the Read tool to view: {diff_file_path}"
+            except Exception as e:
+                console.print(f"⚠️ Failed to save diff to file: {e}")
+                # Fall back to including truncated diff
+                diff_content_for_prompt = diff_output[:5000] + f"
+
+... [TRUNCATED - showing first 5KB of {len(diff_output)} total chars] ...
+
+Please use git diff command for full changes."
         
         if diff_output and len(diff_output.strip()) > 0:
             console.print("✅ Diff contains actual code changes")
