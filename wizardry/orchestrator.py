@@ -471,8 +471,7 @@ Provide your structured JSON review - be concise and actionable.
                 console.print(f"📁 Saved diff to: {diff_file_path}")
                 
                 # Replace diff content in prompt with file reference
-                diff_content_for_prompt = f"[DIFF TOO LARGE - {len(diff_output)} chars]
-Please use the Read tool to view: {diff_file_path}"
+                diff_content_for_prompt = f"[DIFF TOO LARGE - {len(diff_output)} chars]\nPlease use the Read tool to view: {diff_file_path}"
             except Exception as e:
                 console.print(f"⚠️ Failed to save diff to file: {e}")
                 # Fall back to including truncated diff
