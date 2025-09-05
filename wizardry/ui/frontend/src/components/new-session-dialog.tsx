@@ -39,6 +39,8 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
   const discoverRepos = async () => {
     try {
       setDiscovering(true)
+      setError(null)
+      
       const commonPaths = ['.', '..', process.env.HOME || '~']
       let allRepos: RepoInfo[] = []
       
@@ -47,23 +49,36 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
           const repos = await apiClient.discoverRepos(path)
           allRepos = [...allRepos, ...repos]
         } catch (err) {
-          // Ignore individual path errors
+          console.warn(`Failed to discover repos in ${path}:`, err)
         }
       }
       
-      // Remove duplicates based on path
       const uniqueRepos = allRepos.filter((repo, index, self) => 
         index === self.findIndex(r => r.path === repo.path)
       )
       
       setRepos(uniqueRepos)
       
-      if (uniqueRepos.length > 0) {
+      // Load saved preferences
+      const savedRepo = localStorage.getItem('wizardry-last-repo')
+      const savedBranch = localStorage.getItem('wizardry-last-branch')
+      
+      if (savedRepo && uniqueRepos.some(r => r.path === savedRepo)) {
+        setSelectedRepo(savedRepo)
+        const repo = uniqueRepos.find(r => r.path === savedRepo)
+        if (repo && savedBranch && repo.branches.includes(savedBranch)) {
+          setSelectedBranch(savedBranch)
+        } else if (repo) {
+          setSelectedBranch(repo.current_branch)
+        }
+      } else if (uniqueRepos.length > 0) {
         setSelectedRepo(uniqueRepos[0].path)
         setSelectedBranch(uniqueRepos[0].current_branch)
       }
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to discover repositories')
+      console.error('Repository discovery failed:', err)
+      setError(`Unable to discover repositories. ${err instanceof Error ? err.message : 'Please check if the backend is running.'}`)
     } finally {
       setDiscovering(false)
     }
@@ -99,12 +114,14 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
 
       await apiClient.createSession(request)
       
+      // Save preferences to localStorage
+      localStorage.setItem('wizardry-last-repo', selectedRepo)
+      localStorage.setItem('wizardry-last-branch', selectedBranch)
+      
       onSuccess()
       onOpenChange(false)
       
       // Reset form
-      setSelectedRepo('')
-      setSelectedBranch('')
       setTask('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session')
@@ -115,9 +132,10 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
 
   const selectedRepoInfo = repos.find(r => r.path === selectedRepo)
 
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Workflow</DialogTitle>
           <DialogDescription>
@@ -160,19 +178,11 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
             )}
           </div>
 
-          {/* Repository Info */}
-          {selectedRepoInfo && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Current Branch:</span> {selectedRepoInfo.current_branch}
-                </div>
-                <div>
-                  <span className="font-medium">Status:</span> {selectedRepoInfo.is_clean ? 'Clean' : 'Dirty'}
-                </div>
-                <div className="col-span-2">
-                  <span className="font-medium">Available Branches:</span> {selectedRepoInfo.branches.join(', ')}
-                </div>
+          {/* Repository Warning */}
+          {selectedRepoInfo && !selectedRepoInfo.is_clean && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <div className="text-sm text-amber-700">
+                ⚠ Repository has uncommitted changes
               </div>
             </div>
           )}
@@ -202,19 +212,14 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
             <textarea
               value={task}
               onChange={(e) => setTask(e.target.value)}
-              placeholder="Describe what you want the AI agents to implement...
+              placeholder="Describe what you want implemented...
 
-Examples:
-- Add user authentication with email/password
-- Fix the login validation bug in AuthService
-- Implement pagination for the user list
-- Add error handling to API endpoints
-- Refactor the database connection logic"
-              className="w-full p-3 border rounded-md h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+Examples: Add user auth • Fix login bug • Implement pagination"
+              className="w-full p-3 border rounded-md h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
             <p className="text-xs text-gray-500">
-              Be specific about what you want implemented. The more detailed, the better the result.
+              Be specific about what you want implemented.
             </p>
           </div>
 
