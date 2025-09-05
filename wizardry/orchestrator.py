@@ -26,21 +26,57 @@ class WorkflowOrchestrator:
     """Orchestrates multi-agent workflows using Claude Code SDK."""
     
     def __init__(self, repo_path: str, base_branch: str, task: str):
-        self.repo_path = Path(repo_path).resolve()
+        self.original_repo_path = Path(repo_path).resolve()
         self.base_branch = base_branch
         self.task = task
         self.workflow_id = self._generate_workflow_id()
-        self.repo = Repo(self.repo_path)
         
         # Session tracking
         self.session_dir = Path(f"/tmp/wizardry-sessions/{self.workflow_id}")
         self.session_dir.mkdir(parents=True, exist_ok=True)
         (self.session_dir / "transcripts").mkdir(exist_ok=True)
         
+        # Create workspace copy of the repo for Conductor isolation
+        self.repo_path = self._setup_workspace_repo()
+        self.repo = Repo(self.repo_path)
+        
         # Agent configurations
         self.implementer_prompt = self._load_implementer_prompt()
         self.reviewer_prompt = self._load_reviewer_prompt()
         
+    def _setup_workspace_repo(self) -> Path:
+        """Create a workspace copy of the target repo for Conductor isolation."""
+        import shutil
+        import os
+        
+        # Check if we're running in a Conductor workspace
+        current_cwd = Path.cwd()
+        conductor_workspace = "/Users/solal/Documents/GitHub/wizadry/.conductor/"
+        
+        if str(current_cwd).startswith(conductor_workspace):
+            # Running in Conductor - create workspace copy
+            workspace_repo = self.session_dir / "workspace_repo"
+            
+            # Clone the original repo to workspace
+            console.print(f"🔄 Setting up workspace copy of {self.original_repo_path}")
+            try:
+                # Use git clone to copy the repo while preserving git history
+                import subprocess
+                result = subprocess.run([
+                    "git", "clone", str(self.original_repo_path), str(workspace_repo)
+                ], check=True, capture_output=True, text=True)
+                
+                console.print(f"✅ Workspace repo created at {workspace_repo}")
+                return workspace_repo
+                
+            except subprocess.CalledProcessError as e:
+                console.print(f"❌ Failed to clone repo: {e.stderr}")
+                # Fallback: use the original path and hope for the best
+                return self.original_repo_path
+        else:
+            # Not in Conductor - use original path
+            return self.original_repo_path
+    
     def _generate_workflow_id(self) -> str:
         """Generate unique workflow ID."""
         timestamp = str(int(time.time()))
@@ -197,7 +233,8 @@ Focus on issues that matter - good enough to ship, not perfect."""
         
         registry[self.workflow_id] = {
             "session_id": self.workflow_id,
-            "repo_path": str(self.repo_path),
+            "repo_path": str(self.original_repo_path),
+            "workspace_repo_path": str(self.repo_path),
             "base_branch": self.base_branch,
             "task": self.task,
             "status": "in_progress", 
@@ -583,6 +620,32 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
             console.print(f"❌ Error creating PR: {e}")
             return None
     
+    async def _sync_to_original_repo(self):
+        """Sync changes from workspace repo back to original repo if needed."""
+        if self.repo_path == self.original_repo_path:
+            # No workspace copy - nothing to sync
+            return
+            
+        try:
+            import subprocess
+            current_branch = self.repo.active_branch.name
+            
+            console.print(f"🔄 Syncing changes from workspace to original repo...")
+            
+            # Push the branch to original repo
+            result = subprocess.run([
+                "git", "-C", str(self.repo_path), "push", 
+                str(self.original_repo_path), f"{current_branch}:{current_branch}"
+            ], check=True, capture_output=True, text=True)
+            
+            console.print(f"✅ Successfully synced branch '{current_branch}' to original repo")
+            
+        except subprocess.CalledProcessError as e:
+            console.print(f"⚠️ Failed to sync to original repo: {e.stderr}")
+            console.print(f"📋 Manual sync required: git push {self.original_repo_path} {current_branch}")
+        except Exception as e:
+            console.print(f"⚠️ Error during repo sync: {e}")
+    
     async def run_workflow(self) -> bool:
         """Run the complete workflow."""
         console.print(f"🚀 Starting Wizardry workflow: {self.workflow_id}")
@@ -653,6 +716,9 @@ Please fix these issues and commit your changes. Make sure to:
             
             if review_data.get("approval", False):
                 console.print("✅ Review approved!")
+                
+                # Sync changes back to original repo if we're using a workspace copy
+                await self._sync_to_original_repo()
                 
                 # Create PR
                 pr_url = self._create_pr()
