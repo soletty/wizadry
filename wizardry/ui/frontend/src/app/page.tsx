@@ -53,15 +53,6 @@ export default function Dashboard() {
       await apiClient.deleteSession(sessionId)
       await loadSessions()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete session')
-    }
-  }
-
-  const handleArchiveSession = async (sessionId: string) => {
-    try {
-      await apiClient.archiveSession(sessionId, true) // cleanup branch by default
-      await loadSessions()
-    } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to archive session')
     }
   }
@@ -235,24 +226,15 @@ export default function Dashboard() {
                         >
                           View Details
                         </Button>
-                        {(session.status === 'completed' || session.status === 'failed') && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleArchiveSession(session.session_id)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <Archive className="h-4 w-4 mr-1" />
-                            Archive
-                          </Button>
-                        )}
-                        {(session.status === 'in_progress' || session.status === 'failed') && (
+                        {session.status !== 'archived' && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeleteSession(session.session_id)}
+                            className="text-blue-600 hover:text-blue-800"
                           >
-                            Terminate
+                            <Archive className="h-4 w-4 mr-1" />
+                            Archive
                           </Button>
                         )}
                       </div>

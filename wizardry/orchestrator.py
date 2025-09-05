@@ -854,7 +854,7 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
                 console.print(f"📦 Moved session files to: {archived_session_dir}")
             
             # 2. Clean up branch if requested and if we have repo info
-            if cleanup_branch and original_repo_path and session.get("status") in ["completed", "failed"]:
+            if cleanup_branch and original_repo_path and session.get("status") in ["completed", "failed", "terminated"]:
                 try:
                     # Find the branch name from session logs or use pattern
                     branch_pattern = f"wizardry-*{session_id[-6:]}"  # Use last 6 chars of session ID
@@ -882,16 +882,43 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
                 except Exception as e:
                     console.print(f"⚠️ Error cleaning up branch: {e}")
             
-            # 3. Clean up workspace repo if it exists and is different from original
+            # 3. Clean up git worktree if it exists and is different from original
             if workspace_repo_path and workspace_repo_path != original_repo_path:
                 workspace_path = Path(workspace_repo_path)
                 if workspace_path.exists() and workspace_path != Path(original_repo_path):
                     try:
-                        import shutil
-                        shutil.rmtree(workspace_path)
-                        console.print(f"🗑️ Cleaned up workspace repo: {workspace_path}")
+                        import subprocess
+                        # First try to remove the worktree using git worktree remove
+                        result = subprocess.run([
+                            "git", "-C", original_repo_path, "worktree", "remove", str(workspace_path)
+                        ], capture_output=True, text=True)
+                        
+                        if result.returncode == 0:
+                            console.print(f"🗑️ Removed git worktree: {workspace_path}")
+                        else:
+                            # If git worktree remove fails, try force removal and then manual cleanup
+                            console.print(f"⚠️ Git worktree remove failed: {result.stderr}")
+                            
+                            # Force remove from git's worktree list
+                            subprocess.run([
+                                "git", "-C", original_repo_path, "worktree", "remove", "--force", str(workspace_path)
+                            ], capture_output=True, text=True)
+                            
+                            # Manually clean up directory if it still exists
+                            if workspace_path.exists():
+                                import shutil
+                                shutil.rmtree(workspace_path)
+                                console.print(f"🗑️ Manually cleaned up workspace directory: {workspace_path}")
                     except Exception as e:
-                        console.print(f"⚠️ Failed to clean up workspace repo: {e}")
+                        console.print(f"⚠️ Failed to clean up git worktree: {e}")
+                        # Fallback to manual directory cleanup
+                        try:
+                            if workspace_path.exists():
+                                import shutil
+                                shutil.rmtree(workspace_path)
+                                console.print(f"🗑️ Fallback cleanup of workspace directory: {workspace_path}")
+                        except Exception as fallback_e:
+                            console.print(f"⚠️ Fallback cleanup also failed: {fallback_e}")
             
             # 4. Remove from active registry
             del registry[session_id]
@@ -981,8 +1008,7 @@ Please fix these issues and commit your changes. Make sure to:
                 # Create PR
                 pr_url = self._create_pr()
                 
-                # Clean up worktree
-                self._cleanup_worktree()
+                # Keep worktree for diff viewing - cleanup happens during session archive
                 
                 console.print("🎉 Workflow completed successfully!")
                 success = True
@@ -994,9 +1020,7 @@ Please fix these issues and commit your changes. Make sure to:
             console.print(f"❌ Workflow error: {e}")
             success = False
         finally:
-            # Always clean up worktree, even on failure
-            if not success:
-                self._cleanup_worktree()
+            # Worktree cleanup handled during session archive, not here
                 
             # Update session status based on actual result
             status = "completed" if success else "failed"

@@ -378,56 +378,25 @@ async def create_session(request: CreateSessionRequest, background_tasks: Backgr
 
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
-    """Delete/terminate a session."""
-    sessions = load_sessions()
-    
-    if session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    session_data = sessions[session_id]
-    
+    """Delete/terminate a session - now archives the session instead of just marking as terminated."""
     try:
-        # Archive transcripts
-        transcript_dir = Path(f"/tmp/wizardry-sessions/{session_id}/transcripts")
-        archive_dir = Path(f"/tmp/wizardry-sessions/archived/{session_id}")
+        # Use the same archive functionality for both terminate and archive
+        success = WorkflowOrchestrator.archive_session(session_id, cleanup_branch=True)
         
-        if transcript_dir.exists():
-            archive_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(transcript_dir, archive_dir / "transcripts", dirs_exist_ok=True)
-        
-        # Cleanup workspace
-        workspace_dir = Path(f"/tmp/wizardry-sessions/{session_id}")
-        if workspace_dir.exists():
-            shutil.rmtree(workspace_dir, ignore_errors=True)
-        
-        # Cleanup git branch if it exists
-        try:
-            repo = Repo(session_data["repo_path"])
-            branch_name = f"wizardry-{session_id}"
-            if branch_name in [b.name for b in repo.branches]:
-                # Switch to base branch first
-                repo.git.checkout(session_data["base_branch"])
-                # Delete the workflow branch
-                repo.git.branch('-D', branch_name)
-        except Exception:
-            pass  # Branch cleanup is not critical
-        
-        # Update registry
-        sessions[session_id]["status"] = "terminated"
-        sessions[session_id]["terminated_at"] = datetime.now().isoformat()
-        save_sessions(sessions)
-        
-        # Broadcast update to clients
-        message = json.dumps({
-            "type": "session_terminated",
-            "session_id": session_id
-        })
-        await manager.broadcast(message)
-        
-        return {"message": "Session terminated successfully"}
-        
+        if success:
+            # Broadcast update to clients - use archived instead of terminated
+            message = json.dumps({
+                "type": "session_archived",
+                "session_id": session_id
+            })
+            await manager.broadcast(message)
+            
+            return {"message": "Session archived successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to archive session")
+            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error terminating session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error archiving session: {str(e)}")
 
 
 @app.post("/api/sessions/{session_id}/archive")
