@@ -41,6 +41,7 @@ pnpm-debug.log*
 .next/
 out/
 .next/cache/
+*.next/cache/
 .next/server/
 .next/static/
 .next/types/
