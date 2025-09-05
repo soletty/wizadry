@@ -18,7 +18,7 @@ import sys
 current_dir = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(current_dir))
 
-from wizardry.orchestrator import run_orchestrator
+from wizardry.orchestrator import run_orchestrator, WorkflowOrchestrator
 from git import Repo, InvalidGitRepositoryError
 
 
@@ -428,6 +428,28 @@ async def delete_session(session_id: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error terminating session: {str(e)}")
+
+
+@app.post("/api/sessions/{session_id}/archive")
+async def archive_session(session_id: str, cleanup_branch: bool = True):
+    """Archive a session and clean up all associated resources."""
+    try:
+        success = WorkflowOrchestrator.archive_session(session_id, cleanup_branch)
+        
+        if success:
+            # Broadcast update to clients
+            message = json.dumps({
+                "type": "session_archived",
+                "session_id": session_id
+            })
+            await manager.broadcast(message)
+            
+            return {"message": "Session archived successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to archive session")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error archiving session: {str(e)}")
 
 
 @app.get("/api/sessions/{session_id}/transcripts", response_model=TranscriptResponse)

@@ -97,6 +97,12 @@ class ApiClient {
     })
   }
 
+  async archiveSession(sessionId: string, cleanupBranch: boolean = true): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/sessions/${sessionId}/archive?cleanup_branch=${cleanupBranch}`, {
+      method: 'POST'
+    })
+  }
+
   async createSession(request: CreateSessionRequest): Promise<{ message: string; repo_path: string; branch: string; task: string }> {
     return this.request<{ message: string; repo_path: string; branch: string; task: string }>('/sessions', {
       method: 'POST',

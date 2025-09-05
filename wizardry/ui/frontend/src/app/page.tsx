@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, RefreshCw, Zap, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, RefreshCw, Zap, Clock, CheckCircle, XCircle, Archive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -36,7 +36,7 @@ export default function Dashboard() {
 
     // Setup WebSocket for real-time updates
     const ws = new WebSocketClient((data) => {
-      if (data.type === 'session_terminated' || data.type === 'workflow_completed') {
+      if (data.type === 'session_terminated' || data.type === 'workflow_completed' || data.type === 'session_archived') {
         loadSessions() // Refresh sessions when updates arrive
       }
     })
@@ -54,6 +54,15 @@ export default function Dashboard() {
       await loadSessions()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete session')
+    }
+  }
+
+  const handleArchiveSession = async (sessionId: string) => {
+    try {
+      await apiClient.archiveSession(sessionId, true) // cleanup branch by default
+      await loadSessions()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to archive session')
     }
   }
 
@@ -226,6 +235,17 @@ export default function Dashboard() {
                         >
                           View Details
                         </Button>
+                        {(session.status === 'completed' || session.status === 'failed') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleArchiveSession(session.session_id)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Archive className="h-4 w-4 mr-1" />
+                            Archive
+                          </Button>
+                        )}
                         {(session.status === 'in_progress' || session.status === 'failed') && (
                           <Button
                             variant="outline"
