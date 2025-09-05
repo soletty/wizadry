@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Clock, GitBranch, Folder, FileText, Code2, Eye, Trash2, Loader2 } from 'lucide-react'
+import { Clock, GitBranch, Folder, FileText, Code2, Eye, Trash2, Loader2, Copy, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -199,100 +199,141 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
 }
 
 function OverviewTab({ session }: { session: SessionInfo }) {
+  const [copiedItems, setCopiedItems] = useState<{ [key: string]: boolean }>({})
+  
+  const worktreeBranch = `wizardry-${session.session_id}`
+  const repoName = session.repo_path.split('/').pop() || 'unknown'
+
+  const copyToClipboard = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedItems(prev => ({ ...prev, [key]: true }))
+      setTimeout(() => {
+        setCopiedItems(prev => ({ ...prev, [key]: false }))
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err)
+    }
+  }
+
+  const CopyButton = ({ text, copyKey, className = "" }: { text: string, copyKey: string, className?: string }) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      className={`h-6 w-6 p-0 ${className}`}
+      onClick={() => copyToClipboard(text, copyKey)}
+    >
+      {copiedItems[copyKey] ? (
+        <CheckCircle className="h-3 w-3 text-green-600" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </Button>
+  )
+
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6 p-6">
+      {/* Worktree Branch - Prominent Section */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-blue-900 mb-1">Worktree Branch</h3>
+            <p className="text-sm text-blue-700 mb-3">Use this branch to checkout or merge the changes</p>
+            <div className="flex items-center space-x-3">
+              <code className="bg-white px-3 py-1 rounded border text-sm font-mono text-blue-800">
+                {worktreeBranch}
+              </code>
+              <CopyButton text={worktreeBranch} copyKey="branch" />
+            </div>
+          </div>
+          <GitBranch className="h-8 w-8 text-blue-600" />
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-gray-50 border rounded-lg p-4">
+        <h3 className="font-semibold mb-3">Quick Commands</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium">Checkout branch:</span>
+              <code className="ml-2 text-xs bg-white px-2 py-1 rounded border font-mono">
+                git checkout {worktreeBranch}
+              </code>
+            </div>
+            <CopyButton text={`git checkout ${worktreeBranch}`} copyKey="checkout" />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium">Merge to {session.base_branch}:</span>
+              <code className="ml-2 text-xs bg-white px-2 py-1 rounded border font-mono">
+                git checkout {session.base_branch} && git merge {worktreeBranch}
+              </code>
+            </div>
+            <CopyButton text={`git checkout ${session.base_branch} && git merge ${worktreeBranch}`} copyKey="merge" />
+          </div>
+        </div>
+      </div>
+
+      {/* Session Info Grid */}
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-4">
-          <h3 className="font-semibold">Session Details</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Session ID:</span>
-              <span className="font-mono text-xs">{session.session_id}</span>
-            </div>
-            <div className="flex justify-between">
+          <h3 className="font-semibold flex items-center">
+            <Folder className="h-4 w-4 mr-2" />
+            Repository Info
+          </h3>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
               <span className="text-gray-600">Repository:</span>
-              <span>{session.repo_path}</span>
+              <div className="flex items-center space-x-2">
+                <span className="font-medium">{repoName}</span>
+                <CopyButton text={repoName} copyKey="repo" className="opacity-60" />
+              </div>
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-center justify-between">
               <span className="text-gray-600">Base Branch:</span>
-              <span>{session.base_branch}</span>
+              <div className="flex items-center space-x-2">
+                <span className="font-medium">{session.base_branch}</span>
+                <CopyButton text={session.base_branch} copyKey="baseBranch" className="opacity-60" />
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Workspace:</span>
-              <span className="font-mono text-xs">{session.workspace_path}</span>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600">Session ID:</span>
+              <div className="flex items-center space-x-2">
+                <span className="font-mono text-xs">{session.session_id.substring(0, 8)}...</span>
+                <CopyButton text={session.session_id} copyKey="sessionId" className="opacity-60" />
+              </div>
             </div>
           </div>
         </div>
 
         <div className="space-y-4">
-          <h3 className="font-semibold">Timeline</h3>
-          <div className="space-y-2 text-sm">
+          <h3 className="font-semibold flex items-center">
+            <Clock className="h-4 w-4 mr-2" />
+            Timeline
+          </h3>
+          <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">Created:</span>
-              <span>{formatDate(session.created_at)}</span>
+              <span className="font-medium">{formatDate(session.created_at)}</span>
             </div>
             {session.terminated_at && (
               <div className="flex justify-between">
-                <span className="text-gray-600">Terminated:</span>
-                <span>{formatDate(session.terminated_at)}</span>
+                <span className="text-gray-600">Completed:</span>
+                <span className="font-medium">{formatDate(session.terminated_at)}</span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-gray-600">Duration:</span>
-              <span>{formatDuration(session.created_at, session.terminated_at)}</span>
+              <span className="font-medium">{formatDuration(session.created_at, session.terminated_at)}</span>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Progress Indicators */}
-      <div className="space-y-4">
-        <h3 className="font-semibold">Progress</h3>
-        <div className="space-y-3">
-          <ProgressItem 
-            icon="🚀" 
-            text="Workflow Started" 
-            completed={true} 
-          />
-          <ProgressItem 
-            icon="🔧" 
-            text="Implementation Phase" 
-            completed={session.status !== 'in_progress'} 
-            inProgress={session.status === 'in_progress'}
-          />
-          <ProgressItem 
-            icon="🔍" 
-            text="Review Phase" 
-            completed={session.status === 'completed'} 
-          />
-          <ProgressItem 
-            icon="✅" 
-            text="Workflow Completed" 
-            completed={session.status === 'completed'} 
-          />
-        </div>
-      </div>
     </div>
   )
 }
 
-function ProgressItem({ icon, text, completed, inProgress = false }: {
-  icon: string
-  text: string
-  completed: boolean
-  inProgress?: boolean
-}) {
-  return (
-    <div className="flex items-center space-x-3">
-      <span className="text-lg">{icon}</span>
-      <span className={`flex-1 ${completed ? 'text-gray-900' : inProgress ? 'text-blue-600' : 'text-gray-400'}`}>
-        {text}
-      </span>
-      {completed && <span className="text-green-600">✓</span>}
-      {inProgress && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
-    </div>
-  )
-}
 
 function ConversationTab({ conversation, loading }: { 
   conversation: ConversationEntry[]
