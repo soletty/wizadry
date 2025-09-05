@@ -1272,7 +1272,8 @@ Please fix these issues and commit your changes. Make sure to:
                 
                 console.print("🎉 Workflow completed successfully!")
                 if test_plan_data.get("test_plan_generated", False):
-                    console.print("📋 Test plan is ready! Check the UI for detailed testing instructions.")                success = True
+                    console.print("📋 Test plan is ready! Check the UI for detailed testing instructions.")
+                success = True
             else:
                 console.print("❌ Workflow failed after max iterations")
                 success = False
