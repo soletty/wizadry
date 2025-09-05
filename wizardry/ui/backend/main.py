@@ -180,8 +180,8 @@ def parse_transcript_entries(transcript_content: str, agent_name: str) -> List[C
     if not transcript_content.strip():
         return entries
     
-    # Split by the separator "---"
-    sections = transcript_content.split('---')
+    # Split by the actual separator "---\n\n" (not just "---" which appears in git diffs)
+    sections = transcript_content.split('---\n\n')
     
     for section in sections:
         section = section.strip()
@@ -516,7 +516,9 @@ async def get_session_diff(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     
     session_data = sessions[session_id]
-    repo_path = session_data.get("repo_path")
+    # Use workspace repo if available, otherwise fall back to original repo
+    workspace_repo_path = session_data.get("workspace_repo_path")
+    repo_path = workspace_repo_path or session_data.get("repo_path")
     base_branch = session_data.get("base_branch")
     
     if not repo_path or not base_branch:
@@ -524,6 +526,7 @@ async def get_session_diff(session_id: str):
     
     try:
         repo = Repo(repo_path)
+        # Branch created by workflow template as "wizardry-{session_id}"
         workflow_branch = f"wizardry-{session_id}"
         
         # Check if workflow branch exists
