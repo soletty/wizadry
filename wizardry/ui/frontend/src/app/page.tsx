@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
   const [wsClient, setWsClient] = useState<WebSocketClient | null>(null)
 
+
   const loadSessions = async () => {
     try {
       setLoading(true)
@@ -102,7 +103,11 @@ export default function Dashboard() {
             Create your first workflow to get started with automated code implementation.
           </p>
           <Button 
-            onClick={() => setNewSessionOpen(true)}
+            onClick={() => {
+              console.log('Create Workflow button clicked!')
+              setNewSessionOpen(true)
+              console.log('Set newSessionOpen to true')
+            }}
             className="bg-black hover:bg-gray-800 text-white"
           >
             <Plus className="h-4 w-4 mr-2" />
