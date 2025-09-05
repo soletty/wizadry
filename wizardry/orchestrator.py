@@ -65,8 +65,14 @@ class WorkflowOrchestrator:
 2. Identify the minimal change needed
 3. **ACTUALLY IMPLEMENT** - use Write/Edit tools to create/modify files
 4. Test your changes if testing infrastructure exists  
-5. **COMMIT YOUR WORK** - use Bash tool: git add . && git commit -m "message"
-6. Include the required JSON output format
+5. **COMMIT YOUR WORK** - MANDATORY: git add . && git commit -m "descriptive message"
+6. **VERIFY COMMIT** - run git status to confirm commit succeeded
+7. Include the required JSON output format
+
+# COMMIT IS ABSOLUTELY REQUIRED
+If you do not commit your changes, the reviewer will NOT be able to see them and the workflow will FAIL.
+ALWAYS run: git add . && git commit -m "implement [feature]: [brief description]"
+Then verify with: git status
 
 # CRITICAL REQUIREMENTS
 - You MUST use Write/Edit tools to create actual code files
@@ -83,9 +89,13 @@ After implementing AND committing, you MUST include:
   "files_modified": ["list of files you changed"],
   "confidence": 8,
   "testing_notes": "How you verified the solution works",
+  "commit_hash": "First 8 characters of git commit hash",
+  "committed": true,
   "ready_for_review": true
 }
 ```
+
+CRITICAL: Do not mark ready_for_review as true unless you have successfully committed your changes!
 
 Remember: Your job is to SHIP CODE, not just talk about it. Write files, commit changes, then provide the JSON output."""
     
