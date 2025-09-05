@@ -179,11 +179,11 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
           </TabsList>
 
           <div className="flex-1 overflow-hidden">
-            <TabsContent value="overview" className="h-full">
+            <TabsContent value="overview" className="h-full overflow-auto">
               <OverviewTab session={session} />
             </TabsContent>
 
-            <TabsContent value="implementation" className="h-full">
+            <TabsContent value="implementation" className="h-full overflow-hidden">
               <TranscriptTab 
                 title="🔧 Implementer Agent"
                 transcript={transcripts?.implementer || ''}
@@ -191,7 +191,7 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
               />
             </TabsContent>
 
-            <TabsContent value="review" className="h-full">
+            <TabsContent value="review" className="h-full overflow-hidden">
               <TranscriptTab 
                 title="🔍 Reviewer Agent"
                 transcript={transcripts?.reviewer || ''}
@@ -199,7 +199,7 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
               />
             </TabsContent>
 
-            <TabsContent value="changes" className="h-full">
+            <TabsContent value="changes" className="h-full overflow-hidden">
               <DiffTab diff={diff} loading={loading} />
             </TabsContent>
           </div>
