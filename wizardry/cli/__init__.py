@@ -179,12 +179,6 @@ def transcripts(session_id: str):
         
         try:
             content = transcript_file.read_text()
-            # Show last 20 lines to avoid overwhelming output
-            lines = content.split('\n')
-            if len(lines) > 20:
-                rprint("[dim]... (showing last 20 lines) ...[/dim]")
-                content = '\n'.join(lines[-20:])
-            
             rprint(content)
         except Exception as e:
             rprint(f"[red]Error reading {transcript_file}: {e}[/red]")

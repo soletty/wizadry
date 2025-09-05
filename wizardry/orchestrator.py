@@ -124,11 +124,10 @@ You MUST provide structured feedback. Start with the JSON immediately after a br
 }
 ```
 
-CRITICAL: 
-1. Provide the JSON block within your first 3000 characters of response
-2. Do not repeat git diff content in your response  
-3. Focus on actionable feedback only
-4. Keep analysis brief and get to the JSON quickly
+IMPORTANT: 
+1. Provide your JSON review block after your analysis
+2. Focus on the most critical issues
+3. Be thorough but concise in your assessment
 
 # Approval Criteria
 Approve (`"approval": true`) only if:
@@ -389,7 +388,7 @@ Follow the guidelines in your system prompt and make sure to:
         
         options = ClaudeCodeOptions(
             system_prompt=self.reviewer_prompt,
-            max_turns=3,  # Reduced from 5 to keep reviews focused
+            max_turns=8,  # Allow enough turns for thorough review and tool usage
             allowed_tools=["Read", "Grep", "Bash", "LS"],
             model="claude-3-5-sonnet-20241022",
             cwd=str(self.repo_path),  # Set working directory to repo
@@ -425,15 +424,10 @@ Analyze for:
 Provide your structured JSON review - be concise and actionable.
 """
         
-        # Truncate diff if too long to prevent reviewer timeout
-        if len(diff_output) > 5000:
-            console.print(f"📋 Diff is large ({len(diff_output)} chars), truncating for review")
-            diff_lines = diff_output.split('\n')
-            if len(diff_lines) > 200:
-                diff_output = '\n'.join(diff_lines[:100]) + f"\n\n... [Truncated {len(diff_lines)-200} lines] ...\n\n" + '\n'.join(diff_lines[-100:])
-            console.print(f"📋 Truncated diff to {len(diff_output)} characters")
-        else:
-            console.print(f"📋 Sending review prompt with diff length: {len(diff_output)} characters")
+        # Log diff size but don't truncate - let reviewer handle the full context
+        console.print(f"📋 Sending review prompt with diff length: {len(diff_output)} characters")
+        if len(diff_output) > 10000:
+            console.print("📋 Large diff - reviewer will focus on key changes")
         
         if diff_output and len(diff_output.strip()) > 0:
             console.print("✅ Diff contains actual code changes")
