@@ -178,6 +178,40 @@ Focus on issues that matter - good enough to ship, not perfect."""
         console.print(f"📝 Logged {agent_name} conversation to {transcript_file}")
         console.print(f"📏 Response length: {len(response)} characters")
     
+    def _validate_implementation_changes(self, implementation_data: Dict[str, Any]):
+        """Validate that implementer actually made and committed changes."""
+        current_branch = self.repo.active_branch.name
+        
+        # Check if there are any committed changes
+        try:
+            # Check for commits on current branch vs base branch
+            commits_ahead = list(self.repo.iter_commits(f'{self.base_branch}..{current_branch}'))
+            
+            if commits_ahead:
+                console.print(f"✅ Found {len(commits_ahead)} new commit(s) on {current_branch}")
+                # Show the most recent commit
+                latest_commit = commits_ahead[0]
+                console.print(f"📋 Latest commit: {latest_commit.hexsha[:8]} - {latest_commit.message.strip()}")
+                return
+                
+        except Exception as e:
+            console.print(f"⚠️ Error checking commits: {e}")
+        
+        # Check for uncommitted changes if no commits found
+        is_dirty = self.repo.is_dirty()
+        untracked_files = self.repo.untracked_files
+        
+        if is_dirty or untracked_files:
+            console.print("⚠️ Found uncommitted changes - implementer may have forgotten to commit!")
+            if is_dirty:
+                console.print("   📝 Modified files found")
+            if untracked_files:
+                console.print(f"   📁 Untracked files: {untracked_files}")
+            console.print("   💡 This might be why reviewer can't see the changes")
+        else:
+            console.print("⚠️ No changes detected - implementer may not have implemented anything")
+            console.print("   💡 Consider checking if the task was completed")
+    
     async def _run_implementer(self) -> Dict[str, Any]:
         """Run implementer agent session."""
         console.print("🔧 Starting Implementer Agent...")
@@ -226,6 +260,10 @@ Follow the guidelines in your system prompt and make sure to:
             if json_match:
                 implementation_data = json.loads(json_match.group(1))
                 console.print("✅ Implementer completed with structured output")
+                
+                # Validate that implementer actually made changes
+                self._validate_implementation_changes(implementation_data)
+                
                 return implementation_data
             else:
                 console.print("⚠️ No structured output found, assuming ready for review")
