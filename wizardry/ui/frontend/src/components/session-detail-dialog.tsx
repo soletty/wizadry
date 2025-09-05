@@ -170,39 +170,37 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="overview" className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="implementation">Implementation</TabsTrigger>
             <TabsTrigger value="review">Review</TabsTrigger>
             <TabsTrigger value="changes">Git Changes</TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 overflow-hidden">
-            <TabsContent value="overview" className="h-full overflow-auto">
-              <OverviewTab session={session} />
-            </TabsContent>
+          <TabsContent value="overview" className="flex-1 mt-4 overflow-auto">
+            <OverviewTab session={session} />
+          </TabsContent>
 
-            <TabsContent value="implementation" className="h-full overflow-hidden mt-0">
-              <TranscriptTab 
-                title="🔧 Implementer Agent"
-                transcript={transcripts?.implementer || ''}
-                loading={loading}
-              />
-            </TabsContent>
+          <TabsContent value="implementation" className="flex-1 mt-4 min-h-0">
+            <TranscriptTab 
+              title="🔧 Implementer Agent"
+              transcript={transcripts?.implementer || ''}
+              loading={loading}
+            />
+          </TabsContent>
 
-            <TabsContent value="review" className="h-full overflow-hidden mt-0">
-              <TranscriptTab 
-                title="🔍 Reviewer Agent"
-                transcript={transcripts?.reviewer || ''}
-                loading={loading}
-              />
-            </TabsContent>
+          <TabsContent value="review" className="flex-1 mt-4 min-h-0">
+            <TranscriptTab 
+              title="🔍 Reviewer Agent"
+              transcript={transcripts?.reviewer || ''}
+              loading={loading}
+            />
+          </TabsContent>
 
-            <TabsContent value="changes" className="h-full overflow-hidden mt-0">
-              <DiffTab diff={diff} loading={loading} />
-            </TabsContent>
-          </div>
+          <TabsContent value="changes" className="flex-1 mt-4 min-h-0">
+            <DiffTab diff={diff} loading={loading} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
