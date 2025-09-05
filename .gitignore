@@ -38,13 +38,19 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Next.js build output and cache
-.next/
-out/
-.next/cache/
-*.next/cache/
-.next/server/
-.next/static/
-.next/types/
+.next
+out
+.next/cache
+*.next/cache
+.next/server
+.next/static
+.next/types
+
+# Build files
+.next/build-manifest.json
+.next/app-build-manifest.json
+.next/react-loadable-manifest.json
+.next/package.json
 
 # Production builds
 build/
