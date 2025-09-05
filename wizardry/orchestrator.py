@@ -111,7 +111,7 @@ Remember: Your job is to SHIP CODE, not just talk about it. Write files, commit 
 - **Security**: Are there any security concerns?
 
 # Required Output Format
-You MUST provide structured feedback. Be concise and focus on the most important points:
+You MUST provide structured feedback. Start with the JSON immediately after a brief analysis:
 
 ```json:review
 {
@@ -124,7 +124,11 @@ You MUST provide structured feedback. Be concise and focus on the most important
 }
 ```
 
-IMPORTANT: Keep your review focused and concise. Don't repeat the entire git diff in your response.
+CRITICAL: 
+1. Provide the JSON block within your first 3000 characters of response
+2. Do not repeat git diff content in your response  
+3. Focus on actionable feedback only
+4. Keep analysis brief and get to the JSON quickly
 
 # Approval Criteria
 Approve (`"approval": true`) only if:
@@ -344,7 +348,7 @@ Follow the guidelines in your system prompt and make sure to:
         try:
             # First try: diff between base branch and current branch
             diff_output = self.repo.git.diff(self.base_branch, current_branch)
-            console.print(f"📋 Got diff between {self.base_branch} and {current_branch}")
+            console.print(f"📋 Got diff between {self.base_branch} and {current_branch} ({len(diff_output)} chars)")
             
             # If diff is empty, check for uncommitted changes
             if not diff_output.strip():
@@ -353,14 +357,16 @@ Follow the guidelines in your system prompt and make sure to:
                 staged_diff = self.repo.git.diff('--cached')
                 unstaged_diff = self.repo.git.diff()
                 
+                console.print(f"📋 Staged diff: {len(staged_diff)} chars, Unstaged diff: {len(unstaged_diff)} chars")
+                
                 if staged_diff or unstaged_diff:
                     diff_output = f"# Staged changes:\n{staged_diff}\n\n# Unstaged changes:\n{unstaged_diff}"
-                    console.print("📋 Found uncommitted changes for review")
+                    console.print(f"📋 Found uncommitted changes for review ({len(diff_output)} chars total)")
                 else:
                     # Last resort: try HEAD~1 to HEAD if there are recent commits
                     try:
                         diff_output = self.repo.git.diff('HEAD~1', 'HEAD')
-                        console.print("📋 Using last commit diff as fallback")
+                        console.print(f"📋 Using last commit diff as fallback ({len(diff_output)} chars)")
                     except Exception as e:
                         console.print(f"⚠️ No changes found for review: {e}")
                         diff_output = "No code changes detected. Please ensure the implementer has committed their work."
@@ -455,14 +461,22 @@ Provide your structured JSON review - be concise and actionable.
             json_match = re.search(r'```json:review\s*\n(.*?)\n```', full_response, re.DOTALL)
             if json_match:
                 review_data = json.loads(json_match.group(1))
+                console.print(f"✅ Reviewer completed with approval: {review_data.get('approval', False)}")
                 return review_data
             else:
-                console.print("⚠️ No structured review found - this is likely a problem!")
-                console.print("📋 Raw response preview:", full_response[:200] + "..." if len(full_response) > 200 else full_response)
-                return {"approval": False, "overall_assessment": "Review failed - no structured output", "concerns": ["No structured review output provided"]}
+                console.print("⚠️ No structured review found - response may be incomplete!")
+                console.print(f"📋 Response length: {len(full_response)} characters")
+                console.print("📋 Response preview:", full_response[-200:] if len(full_response) > 200 else full_response)
+                
+                # If response looks truncated (ends without proper JSON), indicate incomplete review
+                if len(full_response) > 1000 and not full_response.endswith('```'):
+                    return {"approval": False, "overall_assessment": "Review incomplete - response was truncated", "concerns": ["Reviewer response was cut off mid-analysis"]}
+                else:
+                    return {"approval": False, "overall_assessment": "Review failed - no structured output", "concerns": ["No structured review output provided"]}
         except Exception as e:
             console.print(f"⚠️ Error parsing review output: {e}")
-            console.print("📋 Raw response preview:", full_response[:200] + "..." if len(full_response) > 200 else full_response)
+            console.print(f"📋 Response length: {len(full_response)} characters")
+            console.print("📋 Response preview:", full_response[-200:] if len(full_response) > 200 else full_response)
             return {"approval": False, "overall_assessment": f"Review failed - parsing error: {e}", "concerns": [f"Failed to parse review output: {e}"]}
     
     def _create_pr(self):
