@@ -57,7 +57,12 @@ class WorkflowOrchestrator:
             workspace_repo = self.session_dir / "workspace_repo"
             worktree_branch = f"wizardry-{self.workflow_id}"
             
+            # Ensure session directory exists before creating worktree
+            self.session_dir.mkdir(parents=True, exist_ok=True)
+            
             console.print(f"🔄 Setting up git worktree for {self.original_repo_path}")
+            console.print(f"🔄 Target directory: {workspace_repo}")
+            console.print(f"🔄 Branch: {worktree_branch}")
             
             # Check if branch already exists
             branch_exists = False
@@ -87,13 +92,19 @@ class WorkflowOrchestrator:
                         str(workspace_repo), self.base_branch
                     ], check=True, capture_output=True, text=True)
                 
-                console.print(f"✅ Git worktree created at {workspace_repo}")
-                console.print(f"🌿 Branch: {worktree_branch}")
-                return workspace_repo
+                # Verify the worktree was actually created
+                if workspace_repo.exists():
+                    console.print(f"✅ Git worktree created at {workspace_repo}")
+                    console.print(f"🌿 Branch: {worktree_branch}")
+                    return workspace_repo
+                else:
+                    console.print(f"❌ Worktree command succeeded but directory not found: {workspace_repo}")
+                    return self._fallback_clone_method()
                 
             except subprocess.CalledProcessError as e:
                 console.print(f"❌ Worktree creation failed: {e.stderr}")
                 console.print(f"❌ Command output: {e.stdout}")
+                console.print(f"❌ Return code: {e.returncode}")
                 # Last fallback: use clone method
                 return self._fallback_clone_method()
         else:
