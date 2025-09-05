@@ -58,32 +58,44 @@ class WorkflowOrchestrator:
             worktree_branch = f"wizardry-{self.workflow_id}"
             
             console.print(f"🔄 Setting up git worktree for {self.original_repo_path}")
+            
+            # Check if branch already exists
+            branch_exists = False
             try:
-                # Create worktree with new branch from base branch
                 result = subprocess.run([
-                    "git", "-C", str(self.original_repo_path), 
-                    "worktree", "add", "-b", worktree_branch, 
-                    str(workspace_repo), self.base_branch
-                ], check=True, capture_output=True, text=True)
+                    "git", "-C", str(self.original_repo_path),
+                    "show-ref", "--verify", f"refs/heads/{worktree_branch}"
+                ], capture_output=True, text=True)
+                branch_exists = (result.returncode == 0)
+            except:
+                branch_exists = False
                 
-                console.print(f"✅ Git worktree created at {workspace_repo}")
-                console.print(f"🌿 Branch: {worktree_branch} (from {self.base_branch})")
-                return workspace_repo
-                
-            except subprocess.CalledProcessError as e:
-                console.print(f"❌ Failed to create worktree: {e.stderr}")
-                # Fallback: try without branch creation (branch might exist)
-                try:
+            try:
+                if branch_exists:
+                    console.print(f"🔄 Using existing branch: {worktree_branch}")
+                    # Branch exists, use it without -b
                     result = subprocess.run([
                         "git", "-C", str(self.original_repo_path),
                         "worktree", "add", str(workspace_repo), worktree_branch
                     ], check=True, capture_output=True, text=True)
-                    console.print(f"✅ Git worktree created using existing branch")
-                    return workspace_repo
-                except subprocess.CalledProcessError as e2:
-                    console.print(f"❌ Worktree fallback failed: {e2.stderr}")
-                    # Last fallback: use clone method
-                    return self._fallback_clone_method()
+                else:
+                    console.print(f"🔄 Creating new branch: {worktree_branch}")
+                    # Branch doesn't exist, create it with -b
+                    result = subprocess.run([
+                        "git", "-C", str(self.original_repo_path), 
+                        "worktree", "add", "-b", worktree_branch, 
+                        str(workspace_repo), self.base_branch
+                    ], check=True, capture_output=True, text=True)
+                
+                console.print(f"✅ Git worktree created at {workspace_repo}")
+                console.print(f"🌿 Branch: {worktree_branch}")
+                return workspace_repo
+                
+            except subprocess.CalledProcessError as e:
+                console.print(f"❌ Worktree creation failed: {e.stderr}")
+                console.print(f"❌ Command output: {e.stdout}")
+                # Last fallback: use clone method
+                return self._fallback_clone_method()
         else:
             # Not in Conductor - use original path but still create worktree for isolation
             return self._setup_local_worktree()
@@ -112,13 +124,31 @@ class WorkflowOrchestrator:
         workspace_repo = self.session_dir / "workspace_repo"
         worktree_branch = f"wizardry-{self.workflow_id}"
         
+        # Check if branch already exists
+        branch_exists = False
         try:
-            # Create worktree in session directory
             result = subprocess.run([
                 "git", "-C", str(self.original_repo_path),
-                "worktree", "add", "-b", worktree_branch,
-                str(workspace_repo), self.base_branch
-            ], check=True, capture_output=True, text=True)
+                "show-ref", "--verify", f"refs/heads/{worktree_branch}"
+            ], capture_output=True, text=True)
+            branch_exists = (result.returncode == 0)
+        except:
+            branch_exists = False
+            
+        try:
+            if branch_exists:
+                console.print(f"🔄 Using existing branch: {worktree_branch}")
+                result = subprocess.run([
+                    "git", "-C", str(self.original_repo_path),
+                    "worktree", "add", str(workspace_repo), worktree_branch
+                ], check=True, capture_output=True, text=True)
+            else:
+                console.print(f"🔄 Creating new branch: {worktree_branch}")
+                result = subprocess.run([
+                    "git", "-C", str(self.original_repo_path),
+                    "worktree", "add", "-b", worktree_branch,
+                    str(workspace_repo), self.base_branch
+                ], check=True, capture_output=True, text=True)
             
             console.print(f"✅ Local worktree created at {workspace_repo}")
             return workspace_repo
