@@ -166,11 +166,17 @@ Focus on issues that matter - good enough to ship, not perfect."""
         """Log agent conversations to transcript."""
         transcript_file = self.session_dir / "transcripts" / f"{agent_name}.md"
         
+        # Ensure directory exists
+        transcript_file.parent.mkdir(parents=True, exist_ok=True)
+        
         with open(transcript_file, 'a') as f:
             f.write(f"## [{datetime.now().isoformat()}] {agent_name.title()}\n\n")
             f.write(f"**Task**: {message}\n\n")
             f.write(f"**Response**:\n{response}\n\n")
             f.write("---\n\n")
+        
+        console.print(f"📝 Logged {agent_name} conversation to {transcript_file}")
+        console.print(f"📏 Response length: {len(response)} characters")
     
     async def _run_implementer(self) -> Dict[str, Any]:
         """Run implementer agent session."""
@@ -231,13 +237,52 @@ Follow the guidelines in your system prompt and make sure to:
     async def _run_reviewer(self, implementation_data: Dict[str, Any]) -> Dict[str, Any]:
         """Run reviewer agent session."""
         console.print("🔍 Starting Reviewer Agent...")
+        console.print(f"🔍 Implementation data ready_for_review: {implementation_data.get('ready_for_review', 'Not set')}")
+        console.print(f"🔍 Implementation files_modified: {implementation_data.get('files_modified', 'Not specified')}")
         
         # Get git diff for review
         current_branch = self.repo.active_branch.name
+        diff_output = ""
+        
         try:
+            # First try: diff between base branch and current branch
             diff_output = self.repo.git.diff(self.base_branch, current_branch)
-        except Exception:
-            diff_output = self.repo.git.diff('HEAD~1', 'HEAD')
+            console.print(f"📋 Got diff between {self.base_branch} and {current_branch}")
+            
+            # If diff is empty, check for uncommitted changes
+            if not diff_output.strip():
+                console.print("⚠️ No committed changes found, checking for uncommitted changes...")
+                # Check for uncommitted changes (staged + unstaged)
+                staged_diff = self.repo.git.diff('--cached')
+                unstaged_diff = self.repo.git.diff()
+                
+                if staged_diff or unstaged_diff:
+                    diff_output = f"# Staged changes:\n{staged_diff}\n\n# Unstaged changes:\n{unstaged_diff}"
+                    console.print("📋 Found uncommitted changes for review")
+                else:
+                    # Last resort: try HEAD~1 to HEAD if there are recent commits
+                    try:
+                        diff_output = self.repo.git.diff('HEAD~1', 'HEAD')
+                        console.print("📋 Using last commit diff as fallback")
+                    except Exception as e:
+                        console.print(f"⚠️ No changes found for review: {e}")
+                        diff_output = "No code changes detected. Please ensure the implementer has committed their work."
+            
+        except Exception as e:
+            console.print(f"⚠️ Error getting git diff: {e}")
+            # Enhanced fallback: try multiple approaches
+            try:
+                # Try to get any changes at all
+                diff_output = self.repo.git.diff('HEAD~1', 'HEAD')
+                if not diff_output.strip():
+                    diff_output = self.repo.git.diff('--cached')  # staged changes
+                    if not diff_output.strip():
+                        diff_output = self.repo.git.diff()  # unstaged changes
+                        if not diff_output.strip():
+                            diff_output = "No code changes detected. Implementation may not have been completed or committed."
+            except Exception as fallback_error:
+                console.print(f"⚠️ All diff methods failed: {fallback_error}")
+                diff_output = f"Error retrieving code changes: {str(e)}\nPlease provide the diff manually for review."
         
         options = ClaudeCodeOptions(
             system_prompt=self.reviewer_prompt,
@@ -260,7 +305,14 @@ Please review this implementation:
 {diff_output}
 ```
 
-Analyze this implementation for:
+**Instructions**: 
+If the git diff shows "No code changes detected" or appears incomplete, use your available tools (Read, Grep, LS, Bash) to:
+1. Search for recently modified files related to the task
+2. Read the implementation files to understand what was actually implemented 
+3. Use `git log -1 --stat` or `git show --stat` to see what files were changed
+4. Use `git status` to check for any uncommitted changes
+
+Then analyze the implementation for:
 - Code quality and maintainability
 - Adherence to existing patterns  
 - Correctness of the solution
@@ -268,6 +320,12 @@ Analyze this implementation for:
 
 Provide your structured review output as specified in your system prompt.
 """
+        
+        console.print(f"📋 Sending review prompt with diff length: {len(diff_output)} characters")
+        if diff_output and len(diff_output.strip()) > 0:
+            console.print("✅ Diff contains actual code changes")
+        else:
+            console.print("⚠️ Diff is empty or contains no changes")
         
         full_response = ""
         async with ClaudeSDKClient(options=options) as client:
