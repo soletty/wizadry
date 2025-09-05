@@ -132,6 +132,7 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
 
   const selectedRepoInfo = repos.find(r => r.path === selectedRepo)
 
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

@@ -21,7 +21,6 @@ export default function Dashboard() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
   const [wsClient, setWsClient] = useState<WebSocketClient | null>(null)
 
-
   const loadSessions = async () => {
     try {
       setLoading(true)
@@ -51,7 +50,6 @@ export default function Dashboard() {
       ws.disconnect()
     }
   }, [])
-
 
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -93,27 +91,37 @@ export default function Dashboard() {
 
   if (sessions.length === 0) {
     return (
-      <div className="h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Plus className="h-8 w-8 text-gray-400" />
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="max-w-2xl mx-auto p-6">
+          {error && (
+            <div className="border-l-4 border-red-400 bg-red-50 p-4 mb-6">
+              <div className="text-sm text-red-700">{error}</div>
+            </div>
+          )}
+          
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Plus className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
+            <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+              Create your first workflow to get started with automated code implementation.
+            </p>
+            <Button 
+              onClick={() => setNewSessionOpen(true)}
+              className="bg-black hover:bg-gray-800 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Workflow
+            </Button>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
-          <p className="text-gray-500 mb-6 max-w-sm">
-            Create your first workflow to get started with automated code implementation.
-          </p>
-          <Button 
-            onClick={() => {
-              console.log('Create Workflow button clicked!')
-              setNewSessionOpen(true)
-              console.log('Set newSessionOpen to true')
-            }}
-            className="bg-black hover:bg-gray-800 text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Workflow
-          </Button>
         </div>
+
+        <NewSessionDialog 
+          open={newSessionOpen}
+          onOpenChange={setNewSessionOpen}
+          onSuccess={loadSessions}
+        />
       </div>
     )
   }
@@ -159,7 +167,7 @@ export default function Dashboard() {
                           : session.task}
                       </p>
                     </div>
-                    <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="ml-4">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -178,18 +186,15 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Floating Action Button */}
-      <div className="fixed bottom-6 right-6 group">
-        <Button 
-          onClick={() => setNewSessionOpen(true)}
-          className="h-12 bg-black hover:bg-gray-800 text-white shadow-lg rounded-full px-4 py-2 flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span className="text-sm font-medium hidden group-hover:inline-block">New Workflow</span>
-        </Button>
-      </div>
+      {/* Simple floating action button */}
+      <Button 
+        onClick={() => setNewSessionOpen(true)}
+        className="fixed bottom-6 right-6 h-12 w-12 bg-black hover:bg-gray-800 text-white shadow-lg rounded-full p-0"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
 
-      {/* Dialogs */}
+      {/* Use the original working modal */}
       <NewSessionDialog 
         open={newSessionOpen}
         onOpenChange={setNewSessionOpen}
