@@ -346,6 +346,16 @@ Follow the guidelines in your system prompt and make sure to:
                             text = block.text
                             print(text, end='', flush=True)
                             full_response += text
+                        elif hasattr(block, 'tool_use'):
+                            # Add line breaks before tool usage for better readability
+                            tool_break = f"\n\n[Tool: {block.tool_use.name}]\n"
+                            print(tool_break, end='', flush=True)
+                            full_response += tool_break
+                        elif hasattr(block, 'tool_result'):
+                            # Add line break after tool results
+                            result_break = "\n\n"
+                            print(result_break, end='', flush=True) 
+                            full_response += result_break
         
         # Log the conversation
         self._log_conversation("implementer", task_prompt, full_response)
@@ -393,6 +403,16 @@ Follow the guidelines in your system prompt and make sure to:
                             text = block.text
                             print(text, end='', flush=True)
                             full_response += text
+                        elif hasattr(block, 'tool_use'):
+                            # Add line breaks before tool usage for better readability
+                            tool_break = f"\n\n[Tool: {block.tool_use.name}]\n"
+                            print(tool_break, end='', flush=True)
+                            full_response += tool_break
+                        elif hasattr(block, 'tool_result'):
+                            # Add line break after tool results
+                            result_break = "\n\n"
+                            print(result_break, end='', flush=True) 
+                            full_response += result_break
         
         # Log the conversation
         self._log_conversation("implementer_feedback", feedback_prompt, full_response)
@@ -547,6 +567,16 @@ Provide your structured JSON review - be concise and actionable.
                             text = block.text
                             print(text, end='', flush=True)
                             full_response += text
+                        elif hasattr(block, 'tool_use'):
+                            # Add line breaks before tool usage for better readability
+                            tool_break = f"\n\n[Tool: {block.tool_use.name}]\n"
+                            print(tool_break, end='', flush=True)
+                            full_response += tool_break
+                        elif hasattr(block, 'tool_result'):
+                            # Add line break after tool results
+                            result_break = "\n\n"
+                            print(result_break, end='', flush=True) 
+                            full_response += result_break
         
         # Log the conversation
         self._log_conversation("reviewer", review_prompt, full_response)
