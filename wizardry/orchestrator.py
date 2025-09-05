@@ -60,19 +60,35 @@ class WorkflowOrchestrator:
 - **No Assumptions**: Only use libraries/frameworks that already exist in the codebase
 - **Follow Conventions**: Match existing code style, naming, and patterns exactly
 
-# Your Process (MUST DO ALL STEPS)
-1. Analyze the task and understand the existing codebase
-2. Identify the minimal change needed
-3. **ACTUALLY IMPLEMENT** - use Write/Edit tools to create/modify files
-4. Test your changes if testing infrastructure exists  
-5. **COMMIT YOUR WORK** - MANDATORY: git add . && git commit -m "descriptive message"
-6. **VERIFY COMMIT** - run git status to confirm commit succeeded
-7. Include the required JSON output format
+# YOUR MANDATORY PROCESS (EVERY STEP REQUIRED)
 
-# COMMIT IS ABSOLUTELY REQUIRED
-If you do not commit your changes, the reviewer will NOT be able to see them and the workflow will FAIL.
-ALWAYS run: git add . && git commit -m "implement [feature]: [brief description]"
-Then verify with: git status
+## Phase 1: Implementation  
+1. Analyze the task and understand the existing codebase
+2. Identify the minimal change needed  
+3. **ACTUALLY IMPLEMENT** - use Write/Edit tools to create/modify files
+4. Test your changes if testing infrastructure exists
+
+## Phase 2: COMMIT (MANDATORY - DO NOT SKIP)
+5. **ADD FILES**: Run `git add .` to stage all changes
+6. **COMMIT CHANGES**: Run `git commit -m "implement [feature]: [description]"`  
+7. **VERIFY SUCCESS**: Run `git status` - should show "nothing to commit, working tree clean"
+8. **GET COMMIT HASH**: Run `git log --oneline -1` to get commit hash
+
+## Phase 3: Report Results
+9. Include the required JSON output format with commit hash
+
+# 🚨 CRITICAL WARNING 🚨  
+THE REVIEWER EXPECTS TO SEE YOUR COMMITTED CHANGES.
+IF YOU DO NOT COMMIT, THE WORKFLOW WILL FAIL.
+NO EXCEPTIONS - YOU MUST COMMIT YOUR WORK.
+
+Example commit sequence:
+```bash
+git add .
+git commit -m "implement notification service: add NotificationService class and WebSocket integration"  
+git status  # Verify success
+git log --oneline -1  # Get commit hash
+```
 
 # CRITICAL REQUIREMENTS
 - You MUST use Write/Edit tools to create actual code files
@@ -197,6 +213,10 @@ Focus on issues that matter - good enough to ship, not perfect."""
         """Validate that implementer actually made and committed changes."""
         current_branch = self.repo.active_branch.name
         
+        # Check implementer's claim vs reality
+        claimed_committed = implementation_data.get("committed", False)
+        claimed_hash = implementation_data.get("commit_hash", "")
+        
         # Check if there are any committed changes
         try:
             # Check for commits on current branch vs base branch
@@ -206,7 +226,13 @@ Focus on issues that matter - good enough to ship, not perfect."""
                 console.print(f"✅ Found {len(commits_ahead)} new commit(s) on {current_branch}")
                 # Show the most recent commit
                 latest_commit = commits_ahead[0]
-                console.print(f"📋 Latest commit: {latest_commit.hexsha[:8]} - {latest_commit.message.strip()}")
+                actual_hash = latest_commit.hexsha[:8]
+                console.print(f"📋 Latest commit: {actual_hash} - {latest_commit.message.strip()}")
+                
+                # Validate claimed vs actual hash
+                if claimed_hash and claimed_hash != actual_hash:
+                    console.print(f"⚠️ WARNING: Implementer claimed hash '{claimed_hash}' but actual is '{actual_hash}'")
+                
                 return
                 
         except Exception as e:
@@ -217,12 +243,14 @@ Focus on issues that matter - good enough to ship, not perfect."""
         untracked_files = self.repo.untracked_files
         
         if is_dirty or untracked_files:
-            console.print("⚠️ Found uncommitted changes - implementer may have forgotten to commit!")
+            console.print("❌ VALIDATION FAILED: Found uncommitted changes!")
+            console.print(f"   🎭 Implementer claimed committed={claimed_committed} but this is FALSE")
             if is_dirty:
-                console.print("   📝 Modified files found")
+                console.print("   📝 Modified files found (not committed)")
             if untracked_files:
                 console.print(f"   📁 Untracked files: {untracked_files}")
-            console.print("   💡 This might be why reviewer can't see the changes")
+            console.print("   💡 This is exactly why reviewer can't see the changes")
+            console.print("   🔧 Implementer needs better commit instruction following")
         else:
             console.print("⚠️ No changes detected - implementer may not have implemented anything")
             console.print("   💡 Consider checking if the task was completed")
