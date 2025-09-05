@@ -94,6 +94,17 @@ class TranscriptResponse(BaseModel):
     reviewer: str
 
 
+class ConversationEntry(BaseModel):
+    timestamp: str
+    agent: str  # "implementer" or "reviewer"
+    task: str
+    response: str
+
+
+class ConversationResponse(BaseModel):
+    conversation: List[ConversationEntry]
+
+
 # Utility functions
 def get_session_registry_path() -> Path:
     """Get the session registry path."""
@@ -160,6 +171,65 @@ def get_repo_info(repo_path: str) -> Optional[RepoInfo]:
         )
     except InvalidGitRepositoryError:
         return None
+
+
+def parse_transcript_entries(transcript_content: str, agent_name: str) -> List[ConversationEntry]:
+    """Parse transcript markdown content into conversation entries."""
+    entries = []
+    
+    if not transcript_content.strip():
+        return entries
+    
+    # Split by the separator "---"
+    sections = transcript_content.split('---')
+    
+    for section in sections:
+        section = section.strip()
+        if not section:
+            continue
+        
+        # Extract timestamp from header like "## [2024-01-01T12:00:00] Implementer"
+        lines = section.split('\n')
+        timestamp = ""
+        task = ""
+        response = ""
+        
+        # Find timestamp in first line
+        if lines and lines[0].startswith('## ['):
+            timestamp_match = lines[0]
+            start = timestamp_match.find('[') + 1
+            end = timestamp_match.find(']')
+            if start > 0 and end > start:
+                timestamp = timestamp_match[start:end]
+        
+        # Find task and response
+        task_start = -1
+        response_start = -1
+        
+        for i, line in enumerate(lines):
+            if line.startswith('**Task**:'):
+                task_start = i
+            elif line.startswith('**Response**:'):
+                response_start = i
+                break
+        
+        if task_start >= 0:
+            # Extract task (everything after **Task**: until **Response**: or end)
+            if response_start > task_start:
+                task = '\n'.join(lines[task_start+1:response_start]).strip()
+                response = '\n'.join(lines[response_start+1:]).strip()
+            else:
+                task = '\n'.join(lines[task_start+1:]).strip()
+        
+        if timestamp and (task or response):
+            entries.append(ConversationEntry(
+                timestamp=timestamp,
+                agent=agent_name,
+                task=task,
+                response=response
+            ))
+    
+    return entries
 
 
 def find_git_repos(search_path: str = ".", max_depth: int = 3) -> List[RepoInfo]:
@@ -383,6 +453,36 @@ async def get_transcripts(session_id: str):
         implementer=implementer_transcript,
         reviewer=reviewer_transcript
     )
+
+
+@app.get("/api/sessions/{session_id}/conversation", response_model=ConversationResponse)
+async def get_conversation(session_id: str):
+    """Get unified conversation for a session."""
+    transcript_dir = Path(f"/tmp/wizardry-sessions/{session_id}/transcripts")
+    
+    if not transcript_dir.exists():
+        raise HTTPException(status_code=404, detail="Transcripts not found")
+    
+    all_entries = []
+    
+    # Parse implementer transcript
+    implementer_file = transcript_dir / "implementer.md"
+    if implementer_file.exists():
+        implementer_content = implementer_file.read_text()
+        implementer_entries = parse_transcript_entries(implementer_content, "implementer")
+        all_entries.extend(implementer_entries)
+    
+    # Parse reviewer transcript
+    reviewer_file = transcript_dir / "reviewer.md"
+    if reviewer_file.exists():
+        reviewer_content = reviewer_file.read_text()
+        reviewer_entries = parse_transcript_entries(reviewer_content, "reviewer")
+        all_entries.extend(reviewer_entries)
+    
+    # Sort by timestamp
+    all_entries.sort(key=lambda x: x.timestamp)
+    
+    return ConversationResponse(conversation=all_entries)
 
 
 @app.get("/api/sessions/{session_id}/diff")

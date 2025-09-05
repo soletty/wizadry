@@ -1,0 +1,167 @@
+// API client for Wizardry backend
+
+export interface SessionInfo {
+  session_id: string
+  repo_path: string
+  base_branch: string
+  task: string
+  status: string
+  created_at: string
+  workspace_path: string
+  terminated_at?: string
+}
+
+export interface TranscriptResponse {
+  implementer: string
+  reviewer: string
+}
+
+export interface ConversationEntry {
+  timestamp: string
+  agent: string // "implementer" or "reviewer"
+  task: string
+  response: string
+}
+
+export interface ConversationResponse {
+  conversation: ConversationEntry[]
+}
+
+export interface RepoInfo {
+  path: string
+  name: string
+  branches: string[]
+  current_branch: string
+  is_clean: boolean
+  remote_url?: string
+}
+
+export interface CreateSessionRequest {
+  repo_path: string
+  base_branch: string
+  task: string
+  no_cleanup?: boolean
+  max_iterations?: number
+}
+
+class ApiClient {
+  private baseUrl: string
+
+  constructor(baseUrl: string = 'http://localhost:8001/api') {
+    this.baseUrl = baseUrl
+  }
+
+  private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      ...options,
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(error || `HTTP ${response.status}`)
+    }
+
+    return response.json()
+  }
+
+  async getSessions(): Promise<SessionInfo[]> {
+    return this.request<SessionInfo[]>('/sessions')
+  }
+
+  async getSession(sessionId: string): Promise<SessionInfo> {
+    return this.request<SessionInfo>(`/sessions/${sessionId}`)
+  }
+
+  async getTranscripts(sessionId: string): Promise<TranscriptResponse> {
+    return this.request<TranscriptResponse>(`/sessions/${sessionId}/transcripts`)
+  }
+
+  async getConversation(sessionId: string): Promise<ConversationResponse> {
+    return this.request<ConversationResponse>(`/sessions/${sessionId}/conversation`)
+  }
+
+  async getSessionDiff(sessionId: string): Promise<{ diff: string }> {
+    return this.request<{ diff: string }>(`/sessions/${sessionId}/diff`)
+  }
+
+  async deleteSession(sessionId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/sessions/${sessionId}`, {
+      method: 'DELETE'
+    })
+  }
+
+  async createSession(request: CreateSessionRequest): Promise<{ message: string; repo_path: string; branch: string; task: string }> {
+    return this.request<{ message: string; repo_path: string; branch: string; task: string }>('/sessions', {
+      method: 'POST',
+      body: JSON.stringify(request)
+    })
+  }
+
+  async discoverRepos(searchPath: string = '.'): Promise<RepoInfo[]> {
+    return this.request<RepoInfo[]>(`/repos?search_path=${encodeURIComponent(searchPath)}`)
+  }
+
+  async getRepoInfo(repoPath: string): Promise<RepoInfo> {
+    return this.request<RepoInfo>(`/repos/info?repo_path=${encodeURIComponent(repoPath)}`)
+  }
+}
+
+export const apiClient = new ApiClient()
+
+// WebSocket client for real-time updates
+export class WebSocketClient {
+  private ws: WebSocket | null = null
+  private url: string
+  private onMessage: (data: any) => void
+
+  constructor(onMessage: (data: any) => void) {
+    this.url = 'ws://localhost:8001/api/ws'
+    this.onMessage = onMessage
+  }
+
+  connect() {
+    try {
+      this.ws = new WebSocket(this.url)
+      
+      this.ws.onopen = () => {
+        console.log('WebSocket connected')
+      }
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          this.onMessage(data)
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error)
+        }
+      }
+
+      this.ws.onclose = () => {
+        console.log('WebSocket disconnected')
+      }
+
+      this.ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+      }
+    } catch (error) {
+      console.error('Failed to connect WebSocket:', error)
+    }
+  }
+
+  disconnect() {
+    if (this.ws) {
+      this.ws.close()
+      this.ws = null
+    }
+  }
+
+  send(data: any) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data))
+    }
+  }
+}

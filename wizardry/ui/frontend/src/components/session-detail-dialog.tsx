@@ -11,7 +11,7 @@ import {
   DialogTitle 
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { apiClient, SessionInfo, TranscriptResponse } from '@/lib/api'
+import { apiClient, SessionInfo, TranscriptResponse, ConversationResponse, ConversationEntry } from '@/lib/api'
 import { formatDate, formatDuration, getStatusColor } from '@/lib/utils'
 
 interface SessionDetailDialogProps {
@@ -23,6 +23,7 @@ interface SessionDetailDialogProps {
 export default function SessionDetailDialog({ sessionId, open, onOpenChange }: SessionDetailDialogProps) {
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [transcripts, setTranscripts] = useState<TranscriptResponse | null>(null)
+  const [conversation, setConversation] = useState<ConversationResponse | null>(null)
   const [diff, setDiff] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,10 +40,10 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
       setLoading(true)
       setError(null)
 
-      // Load session info, transcripts, and diff in parallel
-      const [sessionData, transcriptData, diffData] = await Promise.allSettled([
+      // Load session info, conversation, and diff in parallel
+      const [sessionData, conversationData, diffData] = await Promise.allSettled([
         apiClient.getSession(sessionId),
-        apiClient.getTranscripts(sessionId),
+        apiClient.getConversation(sessionId),
         apiClient.getSessionDiff(sessionId),
       ])
 
@@ -50,8 +51,8 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
         setSession(sessionData.value)
       }
 
-      if (transcriptData.status === 'fulfilled') {
-        setTranscripts(transcriptData.value)
+      if (conversationData.status === 'fulfilled') {
+        setConversation(conversationData.value)
       }
 
       if (diffData.status === 'fulfilled') {
@@ -171,10 +172,9 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
+          <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="implementation">Implementation</TabsTrigger>
-            <TabsTrigger value="review">Review</TabsTrigger>
+            <TabsTrigger value="conversation">Conversation</TabsTrigger>
             <TabsTrigger value="changes">Git Changes</TabsTrigger>
           </TabsList>
 
@@ -182,18 +182,9 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
             <OverviewTab session={session} />
           </TabsContent>
 
-          <TabsContent value="implementation" className="flex-1 mt-4 min-h-0">
-            <TranscriptTab 
-              title="🔧 Implementer Agent"
-              transcript={transcripts?.implementer || ''}
-              loading={loading}
-            />
-          </TabsContent>
-
-          <TabsContent value="review" className="flex-1 mt-4 min-h-0">
-            <TranscriptTab 
-              title="🔍 Reviewer Agent"
-              transcript={transcripts?.reviewer || ''}
+          <TabsContent value="conversation" className="flex-1 mt-4 min-h-0">
+            <ConversationTab 
+              conversation={conversation?.conversation || []}
               loading={loading}
             />
           </TabsContent>
@@ -303,9 +294,8 @@ function ProgressItem({ icon, text, completed, inProgress = false }: {
   )
 }
 
-function TranscriptTab({ title, transcript, loading }: { 
-  title: string
-  transcript: string
+function ConversationTab({ conversation, loading }: { 
+  conversation: ConversationEntry[]
   loading: boolean 
 }) {
   if (loading) {
@@ -316,28 +306,98 @@ function TranscriptTab({ title, transcript, loading }: {
     )
   }
 
+  const formatTimestamp = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp)
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false
+      })
+    } catch {
+      return timestamp
+    }
+  }
+
+  if (conversation.length === 0) {
+    return (
+      <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
+        <div className="text-center">
+          <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <p>No conversation available yet</p>
+          <p className="text-sm">Agents haven't started their workflow</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-shrink-0 px-4 pt-4 pb-2">
-        <h3 className="font-semibold">{title}</h3>
+        <h3 className="font-semibold">💬 Agent Conversation</h3>
+        <p className="text-sm text-gray-600 mt-1">
+          Follow the conversation between implementer and reviewer agents
+        </p>
       </div>
-      {transcript ? (
-        <div className="flex-1 mx-4 mb-4 bg-gray-50 rounded-lg border flex flex-col min-h-0">
-          <div className="flex-1 overflow-auto p-4">
-            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-              {transcript}
+      
+      <div className="flex-1 mx-4 mb-4 bg-gradient-to-b from-blue-50 to-green-50 rounded-lg border flex flex-col min-h-0">
+        <div className="flex-1 overflow-auto p-4 space-y-6">
+          {conversation.map((entry, index) => (
+            <div key={index} className={`flex ${entry.agent === 'implementer' ? 'justify-start' : 'justify-end'}`}>
+              <div className={`max-w-4xl rounded-2xl p-4 shadow-sm ${
+                entry.agent === 'implementer' 
+                  ? 'bg-blue-100 border-l-4 border-blue-500' 
+                  : 'bg-green-100 border-l-4 border-green-500'
+              }`}>
+                {/* Agent Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg">
+                      {entry.agent === 'implementer' ? '🔧' : '🔍'}
+                    </span>
+                    <span className={`font-semibold text-sm uppercase tracking-wide ${
+                      entry.agent === 'implementer' ? 'text-blue-800' : 'text-green-800'
+                    }`}>
+                      {entry.agent}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-600 bg-white px-2 py-1 rounded-full">
+                    {formatTimestamp(entry.timestamp)}
+                  </span>
+                </div>
+
+                {/* Task Section */}
+                {entry.task && (
+                  <div className="mb-4">
+                    <h4 className={`text-sm font-medium mb-2 ${
+                      entry.agent === 'implementer' ? 'text-blue-700' : 'text-green-700'
+                    }`}>
+                      📋 Task:
+                    </h4>
+                    <div className="bg-white bg-opacity-70 rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap break-words border">
+                      {entry.task}
+                    </div>
+                  </div>
+                )}
+
+                {/* Response Section */}
+                {entry.response && (
+                  <div>
+                    <h4 className={`text-sm font-medium mb-2 ${
+                      entry.agent === 'implementer' ? 'text-blue-700' : 'text-green-700'
+                    }`}>
+                      💬 Response:
+                    </h4>
+                    <div className="bg-white bg-opacity-70 rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap break-words border">
+                      {entry.response}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ))}
         </div>
-      ) : (
-        <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
-          <div className="text-center">
-            <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p>No transcript available yet</p>
-            <p className="text-sm">Agent hasn't started or completed this phase</p>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
