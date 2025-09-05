@@ -60,7 +60,7 @@ export default function Dashboard() {
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'completed': return 'success'
-      case 'ready_to_test': return 'success'
+      case 'completed': return 'success'
       case 'failed': return 'destructive'
       case 'in_progress': return 'pending'
       case 'terminated': return 'secondary'
@@ -71,7 +71,7 @@ export default function Dashboard() {
   const stats = {
     total: sessions.length,
     active: sessions.filter(s => s.status === 'in_progress').length,
-    completed: sessions.filter(s => s.status === 'completed' || s.status === 'ready_to_test').length,
+    completed: sessions.filter(s => s.status === 'completed' || s.status === 'completed').length,
     failed: sessions.filter(s => s.status === 'failed').length,
   }
 

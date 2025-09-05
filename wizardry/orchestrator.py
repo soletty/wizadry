@@ -901,10 +901,6 @@ Provide your structured JSON test plan data followed by the detailed markdown te
         try:
             test_plan_file = self.session_dir / "test_plan.md"
             with open(test_plan_file, 'w') as f:
-                f.write(f"# Test Plan for: {self.task}\n\n")
-                f.write(f"**Generated**: {datetime.now().isoformat()}\n")
-                f.write(f"**Session ID**: {self.workflow_id}\n\n")
-                f.write("---\n\n")
                 f.write(full_response)
             console.print(f"📋 Test plan saved to: {test_plan_file}")
         except Exception as e:
@@ -1286,7 +1282,7 @@ Please fix these issues and commit your changes. Make sure to:
                 
             # Update session status based on actual result
             if success:
-                status = "ready_to_test" if ('test_plan_data' in locals() and test_plan_data.get("test_plan_generated", False)) else "completed"
+                status = "completed" if ('test_plan_data' in locals() and test_plan_data.get("test_plan_generated", False)) else "completed"
             else:
                 status = "failed"
             self._update_session_status(status)
