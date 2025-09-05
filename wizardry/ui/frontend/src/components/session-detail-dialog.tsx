@@ -322,8 +322,12 @@ function TranscriptTab({ title, transcript, loading }: {
     <div className="h-full flex flex-col p-4">
       <h3 className="font-semibold mb-4">{title}</h3>
       {transcript ? (
-        <div className="flex-1 bg-gray-50 rounded-lg p-4 overflow-auto">
-          <pre className="text-sm whitespace-pre-wrap font-mono">{transcript}</pre>
+        <div className="flex-1 bg-gray-50 rounded-lg border min-h-0 flex flex-col">
+          <div className="flex-1 overflow-auto p-4">
+            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words max-w-none">
+              {transcript}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -351,8 +355,10 @@ function DiffTab({ diff, loading }: { diff: string; loading: boolean }) {
     <div className="h-full flex flex-col p-4">
       <h3 className="font-semibold mb-4">📝 Code Changes</h3>
       {diff ? (
-        <div className="flex-1 bg-gray-900 rounded-lg p-4 overflow-auto">
-          <pre className="text-sm text-gray-100 font-mono whitespace-pre-wrap">{diff}</pre>
+        <div className="flex-1 bg-gray-900 rounded-lg border min-h-0 flex flex-col">
+          <div className="flex-1 overflow-auto p-4">
+            <pre className="text-sm text-gray-100 font-mono whitespace-pre-wrap break-words leading-relaxed">{diff}</pre>
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-gray-500">
