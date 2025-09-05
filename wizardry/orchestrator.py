@@ -374,8 +374,16 @@ Follow the guidelines in your system prompt and make sure to:
         
         try:
             # First try: diff between base branch and current branch
-            diff_output = self.repo.git.diff(self.base_branch, current_branch)
-            console.print(f"📋 Got diff between {self.base_branch} and {current_branch} ({len(diff_output)} chars)")
+            diff_output = self.repo.git.diff(
+                f'{self.base_branch}...{current_branch}',
+                '--', '.',
+                ':(exclude)wizardry/ui/frontend/.next/**',
+                ':(exclude)**/node_modules/**', 
+                ':(exclude)**/__pycache__/**',
+                ':(exclude)**/*.pyc',
+                ':(exclude)**/cache/**'
+            )
+            console.print(f"📋 Got diff between {self.base_branch}...{current_branch} ({len(diff_output)} chars)")
             
             # If diff is empty, check for uncommitted changes
             if not diff_output.strip():
@@ -390,20 +398,14 @@ Follow the guidelines in your system prompt and make sure to:
                     diff_output = f"# Staged changes:\n{staged_diff}\n\n# Unstaged changes:\n{unstaged_diff}"
                     console.print(f"📋 Found uncommitted changes for review ({len(diff_output)} chars total)")
                 else:
-                    # Last resort: try HEAD~1 to HEAD if there are recent commits
-                    try:
-                        diff_output = self.repo.git.diff('HEAD~1', 'HEAD')
-                        console.print(f"📋 Using last commit diff as fallback ({len(diff_output)} chars)")
-                    except Exception as e:
-                        console.print(f"⚠️ No changes found for review: {e}")
-                        diff_output = "No code changes detected. Please ensure the implementer has committed their work."
+                    diff_output = "No code changes detected. Please ensure the implementer has committed their work."
             
         except Exception as e:
             console.print(f"⚠️ Error getting git diff: {e}")
-            # Enhanced fallback: try multiple approaches
+            # Enhanced fallback: try simpler three-dot syntax
             try:
-                # Try to get any changes at all
-                diff_output = self.repo.git.diff('HEAD~1', 'HEAD')
+                diff_output = self.repo.git.diff(f'{self.base_branch}...HEAD')
+                console.print(f"📋 Using simpler three-dot diff as fallback ({len(diff_output)} chars)")
                 if not diff_output.strip():
                     diff_output = self.repo.git.diff('--cached')  # staged changes
                     if not diff_output.strip():
