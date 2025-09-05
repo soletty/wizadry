@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, MoreHorizontal, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { apiClient, SessionInfo, WebSocketClient } from '@/lib/api'
@@ -158,9 +158,10 @@ export default function Dashboard() {
                         variant="ghost"
                         size="sm"
                         onClick={(e) => handleDeleteSession(session.session_id, e)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-gray-400 hover:text-red-500"
+                        title="Archive workflow"
                       >
-                        <MoreHorizontal className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -172,13 +173,13 @@ export default function Dashboard() {
       </div>
 
       {/* Floating Action Button */}
-      <div className="fixed bottom-6 right-6">
+      <div className="fixed bottom-6 right-6 group">
         <Button 
           onClick={() => setNewSessionOpen(true)}
-          size="lg"
-          className="h-14 w-14 rounded-full bg-black hover:bg-gray-800 text-white shadow-lg"
+          className="h-12 bg-black hover:bg-gray-800 text-white shadow-lg rounded-full px-4 py-2 flex items-center space-x-2"
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="h-5 w-5" />
+          <span className="text-sm font-medium hidden group-hover:inline-block">New Workflow</span>
         </Button>
       </div>
 
