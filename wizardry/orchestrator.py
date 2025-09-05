@@ -701,6 +701,31 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
         except Exception as e:
             console.print(f"⚠️ Error during repo sync: {e}")
     
+    def _create_isolated_workspace(self) -> str:
+        """Create an isolated branch for the workflow."""
+        try:
+            # Switch to base branch first
+            self.repo.git.checkout(self.base_branch)
+            
+            # Create isolated branch
+            isolated_branch = f"wizardry-{self.workflow_id}"
+            
+            # Check if branch exists and delete it if it does
+            if isolated_branch in [b.name for b in self.repo.branches]:
+                console.print(f"🔄 Cleaning up existing branch: {isolated_branch}")
+                self.repo.git.branch('-D', isolated_branch)
+                
+            # Create new isolated branch
+            self.repo.git.checkout('-b', isolated_branch)
+            console.print(f"🌟 Created isolated branch: {isolated_branch}")
+            
+            return isolated_branch
+            
+        except Exception as e:
+            console.print(f"❌ Failed to create isolated workspace: {e}")
+            # Fallback to using base branch
+            return self.base_branch
+    
     @staticmethod
     def archive_session(session_id: str, cleanup_branch: bool = True) -> bool:
         """Archive a session and clean up all associated resources."""

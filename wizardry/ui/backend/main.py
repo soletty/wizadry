@@ -494,6 +494,13 @@ async def get_conversation(session_id: str):
         implementer_entries = parse_transcript_entries(implementer_content, "implementer")
         all_entries.extend(implementer_entries)
     
+    # Parse implementer feedback transcript (for iteration loops)
+    implementer_feedback_file = transcript_dir / "implementer_feedback.md"
+    if implementer_feedback_file.exists():
+        implementer_feedback_content = implementer_feedback_file.read_text()
+        implementer_feedback_entries = parse_transcript_entries(implementer_feedback_content, "implementer")
+        all_entries.extend(implementer_feedback_entries)
+    
     # Parse reviewer transcript
     reviewer_file = transcript_dir / "reviewer.md"
     if reviewer_file.exists():
