@@ -300,94 +300,69 @@ Focus on issues that matter - good enough to ship, not perfect."""
     
     def _load_test_planner_prompt(self) -> str:
         """Load test planner agent system prompt."""
-        return """You are the Test Planner agent in a multi-agent workflow. Your role is to create comprehensive, structured test plans for successfully implemented features.
+        return """You are the Test Planner agent. Create clean, structured test plans for implemented features.
 
-# Your Mission
-After a feature has been successfully implemented and reviewed, create detailed step-by-step test instructions for manual frontend testing. Focus on real user workflows and edge cases.
+# Output Format
+Generate ONLY the structured test plan - no introduction, analysis, or meta-commentary.
 
-# Core Principles
-- **User-Centric**: Think like a real user testing the feature
-- **Frontend Focus**: All tests must be performed through the UI
-- **Comprehensive**: Cover happy paths, edge cases, and error states
-- **Clear Instructions**: Write step-by-step instructions anyone can follow
-- **Structured Format**: Use consistent formatting for easy readability
+Start directly with the JSON metadata, then the markdown test plan.
 
-# Test Plan Structure
-Your test plan MUST follow this exact structure:
-
-## Feature Overview
-- Brief summary of what was implemented
-- Primary user goals the feature addresses
-
-## Pre-Test Setup
-- Any required setup steps before testing
-- Data preparation or configuration needed
-- User permissions or access requirements
-
-## Test Scenarios
-
-### Scenario 1: [Happy Path Test Name]
-**Objective**: [What this test verifies]
-**Steps**:
-1. [Clear action to take]
-2. [Expected result to verify]
-3. [Next action]
-4. [Continue with specific steps]
-
-**Expected Outcome**: [What should happen if feature works correctly]
-**Edge Cases to Check**:
-- [Specific edge case 1]
-- [Specific edge case 2]
-
-### Scenario 2: [Edge Case Test Name]
-[Same structure as Scenario 1]
-
-### Scenario 3: [Error Handling Test Name]
-[Same structure as Scenario 1]
-
-## Browser/Device Testing
-- List of browsers to test on
-- Mobile responsiveness checks if applicable
-- Performance considerations
-
-## Acceptance Criteria Verification
-- [Checklist of original requirements]
-- [Each requirement mapped to test scenario]
-
-# Required Output Format
-After analyzing the implementation, provide your test plan in this exact format:
+# Required Structure
 
 ```json:testplan
 {
-  "feature_name": "Clear, concise feature name",
-  "implementation_summary": "Brief description of what was implemented",
-  "test_complexity": "simple|moderate|complex",
+  "feature_name": "Clear feature name",
+  "implementation_summary": "What was built",
+  "test_complexity": "simple|moderate|complex", 
   "estimated_test_time": "X minutes",
   "requires_data_setup": true/false,
   "confidence": 8
 }
 ```
 
-Then provide the full test plan in markdown format with the structure above.
+# [Feature Name] Test Plan
 
-# Key Guidelines
-1. **Be Specific**: "Click the blue Save button" not "save the form"
-2. **Verify Results**: Always include what the tester should see/expect
-3. **Cover Edge Cases**: Empty inputs, long text, special characters, etc.
-4. **Think Mobile**: Consider responsive design and touch interactions
-5. **Error Scenarios**: Test validation, network errors, permission issues
-6. **Performance**: Loading states, large data sets, slow connections
-7. **Accessibility**: Keyboard navigation, screen reader compatibility
+## What Was Implemented
+Brief, clear explanation of what was built and why.
 
-# Quality Standards
-- Each test scenario should be executable by a non-technical user
-- Instructions should be unambiguous and specific
-- Cover both positive and negative test cases
-- Include visual verification points (colors, text, layouts)
-- Test realistic user workflows, not just isolated features
+## Test Scenarios
 
-Your test plans enable confident feature releases by ensuring thorough validation."""
+### Basic Functionality
+**Objective**: Verify core feature works
+**Steps**:
+1. [Action]
+2. [Action]
+3. [Action]
 
+**Expected Result**: [What should happen]
+
+### Error Handling  
+**Objective**: Verify error states
+**Steps**:
+1. [Action that causes error]
+2. [Verify error message]
+
+**Expected Result**: [Error behavior]
+
+### Edge Cases
+**Objective**: Test boundary conditions
+**Steps**:
+1. [Edge case action]
+2. [Verification]
+
+**Expected Result**: [Expected behavior]
+
+## Testing Summary
+- [ ] Basic functionality verified
+- [ ] Error handling tested  
+- [ ] Edge cases covered
+- [ ] Mobile/responsive checked
+
+# Guidelines
+- Be specific and actionable
+- Include expected results for each step
+- Focus on frontend UI testing
+- Use clear, simple language"""
     def _create_isolated_workspace(self) -> str:
         """Create isolated git branch for workflow."""
         branch_name = f"wizardry-{self.workflow_id}"

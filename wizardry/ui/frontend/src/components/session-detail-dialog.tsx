@@ -11,6 +11,8 @@ import {
   DialogTitle 
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { apiClient, SessionInfo, TranscriptResponse, ConversationResponse, ConversationEntry, TestPlanResponse } from '@/lib/api'
 import { formatDate, formatDuration, getStatusColor } from '@/lib/utils'
 
@@ -581,69 +583,39 @@ function TestPlanTab({ testPlan, loading }: {
     )
   }
 
-  // Simple markdown renderer for test content
-  const renderContent = (content: string) => {
+  // Clean the content by removing JSON metadata and AI preamble
+  const cleanContent = (content: string) => {
     const lines = content.split('\n')
-    const elements: JSX.Element[] = []
+    let cleanedLines: string[] = []
+    let skipJsonBlock = false
+    let foundFirstHeader = false
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim()
+    for (const line of lines) {
+      const trimmed = line.trim()
       
-      // Skip JSON blocks and empty lines
-      if (line.startsWith('{') || line.startsWith('}') || line.startsWith('"') || 
-          line.startsWith('```') || !line) {
+      // Skip JSON blocks
+      if (trimmed.startsWith('```json') || trimmed.startsWith('```')) {
+        skipJsonBlock = !skipJsonBlock
+        continue
+      }
+      if (skipJsonBlock) continue
+      
+      // Skip JSON object lines
+      if (trimmed.startsWith('{') || trimmed.startsWith('}') || trimmed.startsWith('"')) {
         continue
       }
       
-      // Headers
-      if (line.startsWith('### ')) {
-        elements.push(<h3 key={i} className="text-lg font-semibold mt-6 mb-3 text-gray-800">{line.slice(4)}</h3>)
-      } else if (line.startsWith('## ')) {
-        elements.push(<h2 key={i} className="text-xl font-bold mt-8 mb-4 text-gray-900">{line.slice(3)}</h2>)
-      } else if (line.startsWith('# ')) {
-        elements.push(<h1 key={i} className="text-2xl font-bold mt-8 mb-4 text-gray-900">{line.slice(2)}</h1>)
+      // Skip AI preamble text - look for first markdown header
+      if (trimmed.startsWith('#') && !foundFirstHeader) {
+        foundFirstHeader = true
       }
-      // List items with checkboxes
-      else if (line.match(/^- \[.\]/) || line.match(/^\d+\./)) {
-        const text = line.replace(/^- \[.\]\s*/, '').replace(/^\d+\.\s*/, '')
-        if (text) {
-          elements.push(
-            <div key={i} className="flex items-start space-x-2 mb-2">
-              <input type="checkbox" className="mt-1 h-3 w-3 text-green-600 border-gray-300 rounded focus:ring-green-500" />
-              <span className="text-sm text-gray-700 leading-relaxed">{text}</span>
-            </div>
-          )
-        }
-      }
-      else if (line.startsWith('- ')) {
-        elements.push(
-          <div key={i} className="flex items-start space-x-2 mb-1">
-            <span className="text-gray-400 mt-1">•</span>
-            <span className="text-sm text-gray-700">{line.slice(2)}</span>
-          </div>
-        )
-      }
-      // Bold text patterns
-      else if (line.includes('**') && line.includes(':')) {
-        const boldMatch = line.match(/\*\*(.*?)\*\*:(.*)/);
-        if (boldMatch) {
-          elements.push(
-            <p key={i} className="mb-2 text-sm">
-              <strong className="font-semibold text-gray-800">{boldMatch[1]}:</strong>
-              <span className="ml-1 text-gray-700">{boldMatch[2]}</span>
-            </p>
-          )
-        } else {
-          elements.push(<p key={i} className="mb-2 text-gray-700 leading-relaxed">{line}</p>)
-        }
-      }
-      // Regular paragraphs
-      else if (line.length > 0) {
-        elements.push(<p key={i} className="mb-2 text-gray-700 leading-relaxed">{line}</p>)
+      
+      if (foundFirstHeader) {
+        cleanedLines.push(line)
       }
     }
     
-    return elements
+    return cleanedLines.join('\n').trim()
   }
 
   return (
@@ -666,10 +638,74 @@ function TestPlanTab({ testPlan, loading }: {
         </div>
       </div>
 
-      {/* Test content - no inner container */}
+      {/* Test content with proper frame */}
       <div className="flex-1 mx-4 mb-4 overflow-auto">
-        <div className="space-y-3">
-          {renderContent(testPlan.test_plan_content)}
+        <div className="border border-gray-200 rounded-lg bg-white p-6 shadow-sm prose prose-sm max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h1: ({ children }) => (
+                <h1 className="text-2xl font-bold text-gray-900 mt-0 mb-4 pb-2 border-b border-gray-200">
+                  {children}
+                </h1>
+              ),
+              h2: ({ children }) => (
+                <h2 className="text-xl font-semibold text-gray-800 mt-6 mb-3">
+                  {children}
+                </h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className="text-lg font-medium text-gray-800 mt-4 mb-2">
+                  {children}
+                </h3>
+              ),
+              p: ({ children }) => (
+                <p className="text-gray-700 leading-relaxed mb-3">
+                  {children}
+                </p>
+              ),
+              ul: ({ children }) => (
+                <ul className="space-y-2 mb-4">
+                  {children}
+                </ul>
+              ),
+              li: ({ children }) => {
+                const text = children?.toString() || ''
+                // Handle checkbox lists
+                if (text.includes('[ ]') || text.includes('[x]')) {
+                  const isChecked = text.includes('[x]')
+                  const cleanText = text.replace(/\[.\]\s*/, '')
+                  return (
+                    <li className="flex items-start space-x-2">
+                      <input 
+                        type="checkbox" 
+                        checked={isChecked}
+                        disabled
+                        className="mt-1 h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                      />
+                      <span className="text-sm text-gray-700">{cleanText}</span>
+                    </li>
+                  )
+                }
+                return (
+                  <li className="flex items-start space-x-2">
+                    <span className="text-green-600 mt-1">•</span>
+                    <span className="text-sm text-gray-700">{children}</span>
+                  </li>
+                )
+              },
+              strong: ({ children }) => (
+                <strong className="font-semibold text-gray-800">{children}</strong>
+              ),
+              code: ({ children }) => (
+                <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-gray-800">
+                  {children}
+                </code>
+              )
+            }}
+          >
+            {cleanContent(testPlan.test_plan_content)}
+          </ReactMarkdown>
         </div>
       </div>
     </div>
