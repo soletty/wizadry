@@ -224,8 +224,8 @@ def kill(session_id: str):
 
 
 @cli.command()
-@click.option('--port', default=3000, help='Port to run the frontend on (default: 3000)')
-@click.option('--api-port', default=8000, help='Port to run the API on (default: 8000)')
+@click.option('--port', default=3005, help='Port to run the frontend on (default: 3005)')
+@click.option('--api-port', default=8001, help='Port to run the API on (default: 8001)')
 def ui(port: int, api_port: int):
     """Launch the Wizardry web UI (TypeScript/Next.js)."""
     import os
@@ -274,8 +274,7 @@ def ui(port: int, api_port: int):
             time.sleep(2)  # Give backend time to start
             rprint("[blue]🎨 Starting frontend server...[/blue]")
             subprocess.run([
-                "npm", "run", "dev",
-                "--", "--port", str(port)
+                "npm", "run", "dev"
             ], cwd=frontend_dir)
         except Exception as e:
             rprint(f"[red]❌ Frontend error: {e}[/red]")
