@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, RefreshCw, Zap, Clock, CheckCircle, XCircle, Archive } from 'lucide-react'
+import { Plus, RefreshCw, Clock, CheckCircle, XCircle, Archive, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -92,13 +92,7 @@ export default function Dashboard() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Zap className="h-8 w-8 text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-900">Wizardry</h1>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                AI Agent Orchestrator
-              </Badge>
+              <h1 className="text-xl font-semibold text-gray-900">Workflows</h1>
             </div>
             <div className="flex items-center space-x-3">
               <Button
@@ -129,50 +123,22 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Sessions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Active</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <div className="text-2xl font-bold text-blue-600">{stats.active}</div>
-                <Clock className="h-4 w-4 ml-2 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Completed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-                <CheckCircle className="h-4 w-4 ml-2 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Failed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-                <XCircle className="h-4 w-4 ml-2 text-red-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Stats Overview */}
+        {sessions.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center space-x-6 text-sm text-gray-600">
+              <span>{stats.total} total</span>
+              {stats.active > 0 && (
+                <span className="flex items-center space-x-1">
+                  <Activity className="h-3 w-3 text-blue-500" />
+                  <span>{stats.active} active</span>
+                </span>
+              )}
+              {stats.completed > 0 && <span className="text-green-600">{stats.completed} completed</span>}
+              {stats.failed > 0 && <span className="text-red-600">{stats.failed} failed</span>}
+            </div>
+          </div>
+        )}
 
         {/* Sessions List */}
         <div className="space-y-4">
@@ -183,16 +149,17 @@ export default function Dashboard() {
 
           {sessions.length === 0 ? (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Zap className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
-                <p className="text-gray-500 text-center mb-4">
-                  Create your first AI workflow to get started with automated code implementation.
-                </p>
-                <Button onClick={() => setNewSessionOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Workflow
-                </Button>
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <div className="text-center">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
+                  <p className="text-gray-500 mb-6">
+                    Create your first workflow to get started.
+                  </p>
+                  <Button onClick={() => setNewSessionOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Workflow
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -213,9 +180,11 @@ export default function Dashboard() {
                           </Badge>
                         </div>
                         <CardDescription className="flex items-center space-x-4 text-sm">
-                          <span>📁 {session.repo_path.split('/').pop()}</span>
-                          <span>🌿 {session.base_branch}</span>
-                          <span>🕒 {formatDate(session.created_at)}</span>
+                          <span>{session.repo_path.split('/').pop()}</span>
+                          <span className="text-gray-400">•</span>
+                          <span>{session.base_branch}</span>
+                          <span className="text-gray-400">•</span>
+                          <span>{formatDate(session.created_at)}</span>
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">

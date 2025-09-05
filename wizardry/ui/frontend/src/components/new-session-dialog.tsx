@@ -28,6 +28,14 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
   const [discovering, setDiscovering] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Load saved preferences from localStorage
+  useEffect(() => {
+    const savedRepo = localStorage.getItem('wizardry-last-repo')
+    const savedBranch = localStorage.getItem('wizardry-last-branch')
+    if (savedRepo) setSelectedRepo(savedRepo)
+    if (savedBranch) setSelectedBranch(savedBranch)
+  }, [])
+
   useEffect(() => {
     if (open) {
       discoverRepos()
@@ -99,12 +107,14 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
 
       await apiClient.createSession(request)
       
+      // Save preferences to localStorage
+      localStorage.setItem('wizardry-last-repo', selectedRepo)
+      localStorage.setItem('wizardry-last-branch', selectedBranch)
+      
       onSuccess()
       onOpenChange(false)
       
       // Reset form
-      setSelectedRepo('')
-      setSelectedBranch('')
       setTask('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session')
@@ -117,7 +127,7 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Workflow</DialogTitle>
           <DialogDescription>
@@ -162,17 +172,10 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
 
           {/* Repository Info */}
           {selectedRepoInfo && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Current Branch:</span> {selectedRepoInfo.current_branch}
-                </div>
-                <div>
-                  <span className="font-medium">Status:</span> {selectedRepoInfo.is_clean ? 'Clean' : 'Dirty'}
-                </div>
-                <div className="col-span-2">
-                  <span className="font-medium">Available Branches:</span> {selectedRepoInfo.branches.join(', ')}
-                </div>
+            <div className="p-3 bg-gray-50 border rounded-md">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Current: <span className="font-medium">{selectedRepoInfo.current_branch}</span></span>
+                <span className="text-gray-600">{selectedRepoInfo.is_clean ? '✓ Clean' : '⚠ Uncommitted changes'}</span>
               </div>
             </div>
           )}
@@ -202,19 +205,14 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
             <textarea
               value={task}
               onChange={(e) => setTask(e.target.value)}
-              placeholder="Describe what you want the AI agents to implement...
+              placeholder="Describe what you want implemented...
 
-Examples:
-- Add user authentication with email/password
-- Fix the login validation bug in AuthService
-- Implement pagination for the user list
-- Add error handling to API endpoints
-- Refactor the database connection logic"
-              className="w-full p-3 border rounded-md h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+Examples: Add user auth • Fix login bug • Implement pagination"
+              className="w-full p-3 border rounded-md h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
             <p className="text-xs text-gray-500">
-              Be specific about what you want implemented. The more detailed, the better the result.
+              Be specific about what you want implemented.
             </p>
           </div>
 
