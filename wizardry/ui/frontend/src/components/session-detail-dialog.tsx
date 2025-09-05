@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Clock, GitBranch, Folder, FileText, Code2, Eye, Trash2, Loader2, Copy, CheckCircle } from 'lucide-react'
+import { Clock, GitBranch, Folder, FileText, Code2, Eye, Trash2, Loader2, Copy, CheckCircle, ClipboardCheck, Target, Timer, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -11,7 +11,7 @@ import {
   DialogTitle 
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { apiClient, SessionInfo, TranscriptResponse, ConversationResponse, ConversationEntry } from '@/lib/api'
+import { apiClient, SessionInfo, TranscriptResponse, ConversationResponse, ConversationEntry, TestPlanResponse } from '@/lib/api'
 import { formatDate, formatDuration, getStatusColor } from '@/lib/utils'
 
 interface SessionDetailDialogProps {
@@ -25,6 +25,7 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
   const [transcripts, setTranscripts] = useState<TranscriptResponse | null>(null)
   const [conversation, setConversation] = useState<ConversationResponse | null>(null)
   const [diff, setDiff] = useState<string>('')
+  const [testPlan, setTestPlan] = useState<TestPlanResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -40,11 +41,12 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
       setLoading(true)
       setError(null)
 
-      // Load session info, conversation, and diff in parallel
-      const [sessionData, conversationData, diffData] = await Promise.allSettled([
+      // Load session info, conversation, diff, and test plan in parallel
+      const [sessionData, conversationData, diffData, testPlanData] = await Promise.allSettled([
         apiClient.getSession(sessionId),
         apiClient.getConversation(sessionId),
         apiClient.getSessionDiff(sessionId),
+        apiClient.getTestPlan(sessionId),
       ])
 
       if (sessionData.status === 'fulfilled') {
@@ -57,6 +59,13 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
 
       if (diffData.status === 'fulfilled') {
         setDiff(diffData.value.diff)
+      }
+
+      if (testPlanData.status === 'fulfilled') {
+        setTestPlan(testPlanData.value)
+      } else {
+        // Test plan might not exist for older sessions or sessions not ready for testing
+        setTestPlan(null)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load session data')
@@ -82,6 +91,7 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'completed': return 'success'
+      case 'ready_to_test': return 'success'
       case 'failed': return 'destructive'
       case 'in_progress': return 'pending'
       case 'terminated': return 'secondary'
@@ -172,10 +182,15 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
+          <TabsList className={`grid w-full flex-shrink-0 ${testPlan ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="conversation">Conversation</TabsTrigger>
             <TabsTrigger value="changes">Diff</TabsTrigger>
+            {testPlan && (
+              <TabsTrigger value="test-plan" className="text-green-700 font-medium">
+                ✅ Test Plan
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="overview" className="flex-1 mt-4 overflow-auto">
@@ -192,6 +207,12 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
           <TabsContent value="changes" className="flex-1 mt-4 min-h-0">
             <DiffTab diff={diff} loading={loading} />
           </TabsContent>
+
+          {testPlan && (
+            <TabsContent value="test-plan" className="flex-1 mt-4 min-h-0">
+              <TestPlanTab testPlan={testPlan} loading={loading} />
+            </TabsContent>
+          )}
         </Tabs>
       </DialogContent>
     </Dialog>
@@ -533,6 +554,146 @@ function EnhancedDiffViewer({ diff }: { diff: string }) {
         }
         return null
       })}
+    </div>
+  )
+}
+
+function TestPlanTab({ testPlan, loading }: { 
+  testPlan: TestPlanResponse
+  loading: boolean 
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    )
+  }
+
+  if (!testPlan) {
+    return (
+      <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
+        <div className="text-center">
+          <ClipboardCheck className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <p>No test plan available</p>
+          <p className="text-sm">Test plan generation may have failed or not started</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Function to render markdown content with basic formatting
+  const renderMarkdown = (content: string) => {
+    // Split by lines and process each line
+    const lines = content.split('\n')
+    const elements: JSX.Element[] = []
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      
+      // Headers
+      if (line.startsWith('### ')) {
+        elements.push(<h3 key={i} className="text-lg font-semibold mt-6 mb-3 text-gray-800">{line.slice(4)}</h3>)
+      } else if (line.startsWith('## ')) {
+        elements.push(<h2 key={i} className="text-xl font-bold mt-8 mb-4 text-gray-900">{line.slice(3)}</h2>)
+      } else if (line.startsWith('# ')) {
+        elements.push(<h1 key={i} className="text-2xl font-bold mt-8 mb-4 text-gray-900">{line.slice(2)}</h1>)
+      }
+      // Bold text like **Objective**:
+      else if (line.includes('**') && line.includes(':')) {
+        const boldMatch = line.match(/\*\*(.*?)\*\*:(.*)/);
+        if (boldMatch) {
+          elements.push(
+            <p key={i} className="mb-2">
+              <strong className="font-semibold text-gray-800">{boldMatch[1]}:</strong>
+              <span className="ml-1">{boldMatch[2]}</span>
+            </p>
+          )
+        } else {
+          elements.push(<p key={i} className="mb-2">{line}</p>)
+        }
+      }
+      // List items
+      else if (line.match(/^\d+\./)) {
+        elements.push(<li key={i} className="ml-4 mb-1 list-decimal list-inside">{line.replace(/^\d+\./, '').trim()}</li>)
+      } else if (line.startsWith('- ')) {
+        elements.push(<li key={i} className="ml-4 mb-1 list-disc list-inside">{line.slice(2)}</li>)
+      }
+      // Code blocks (simple detection)
+      else if (line.startsWith('```')) {
+        // Skip code block markers
+        continue
+      }
+      // Empty lines
+      else if (line.trim() === '') {
+        elements.push(<div key={i} className="mb-2"></div>)
+      }
+      // Regular paragraphs
+      else if (line.trim().length > 0) {
+        elements.push(<p key={i} className="mb-2 leading-relaxed text-gray-700">{line}</p>)
+      }
+    }
+    
+    return elements
+  }
+
+  const getComplexityColor = (complexity: string) => {
+    switch (complexity.toLowerCase()) {
+      case 'simple': return 'bg-green-100 text-green-800 border-green-200'
+      case 'moderate': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'complex': return 'bg-red-100 text-red-800 border-red-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Test Plan Header */}
+      <div className="mx-4 mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-green-900 mb-2 flex items-center">
+              <ClipboardCheck className="h-6 w-6 mr-2" />
+              {testPlan.feature_name}
+            </h2>
+            <p className="text-green-800 text-sm mb-3">{testPlan.implementation_summary}</p>
+          </div>
+        </div>
+
+        {/* Test Plan Metadata */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center space-x-2">
+            <Target className="h-4 w-4 text-green-600" />
+            <span className="text-sm font-medium text-green-700">Complexity:</span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getComplexityColor(testPlan.test_complexity)}`}>
+              {testPlan.test_complexity}
+            </span>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Timer className="h-4 w-4 text-green-600" />
+            <span className="text-sm font-medium text-green-700">Est. Time:</span>
+            <span className="text-sm text-green-800">{testPlan.estimated_test_time}</span>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Settings className="h-4 w-4 text-green-600" />
+            <span className="text-sm font-medium text-green-700">Setup Required:</span>
+            <span className={`text-sm ${testPlan.requires_data_setup ? 'text-orange-700' : 'text-green-700'}`}>
+              {testPlan.requires_data_setup ? 'Yes' : 'No'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Test Plan Content */}
+      <div className="flex-1 mx-4 mb-4 bg-white rounded-lg border border-gray-200 flex flex-col min-h-0">
+        <div className="flex-1 overflow-auto p-6">
+          <div className="prose prose-sm max-w-none">
+            {renderMarkdown(testPlan.test_plan_content)}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

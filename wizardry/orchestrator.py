@@ -43,6 +43,7 @@ class WorkflowOrchestrator:
         # Agent configurations
         self.implementer_prompt = self._load_implementer_prompt()
         self.reviewer_prompt = self._load_reviewer_prompt()
+        self.test_planner_prompt = self._load_test_planner_prompt()
         
     def _setup_workspace_repo(self) -> Path:
         """Create a workspace using git worktrees for isolation."""
@@ -296,6 +297,96 @@ Approve (`"approval": true`) only if:
 - Handles errors appropriately
 
 Focus on issues that matter - good enough to ship, not perfect."""
+    
+    def _load_test_planner_prompt(self) -> str:
+        """Load test planner agent system prompt."""
+        return """You are the Test Planner agent in a multi-agent workflow. Your role is to create comprehensive, structured test plans for successfully implemented features.
+
+# Your Mission
+After a feature has been successfully implemented and reviewed, create detailed step-by-step test instructions for manual frontend testing. Focus on real user workflows and edge cases.
+
+# Core Principles
+- **User-Centric**: Think like a real user testing the feature
+- **Frontend Focus**: All tests must be performed through the UI
+- **Comprehensive**: Cover happy paths, edge cases, and error states
+- **Clear Instructions**: Write step-by-step instructions anyone can follow
+- **Structured Format**: Use consistent formatting for easy readability
+
+# Test Plan Structure
+Your test plan MUST follow this exact structure:
+
+## Feature Overview
+- Brief summary of what was implemented
+- Primary user goals the feature addresses
+
+## Pre-Test Setup
+- Any required setup steps before testing
+- Data preparation or configuration needed
+- User permissions or access requirements
+
+## Test Scenarios
+
+### Scenario 1: [Happy Path Test Name]
+**Objective**: [What this test verifies]
+**Steps**:
+1. [Clear action to take]
+2. [Expected result to verify]
+3. [Next action]
+4. [Continue with specific steps]
+
+**Expected Outcome**: [What should happen if feature works correctly]
+**Edge Cases to Check**:
+- [Specific edge case 1]
+- [Specific edge case 2]
+
+### Scenario 2: [Edge Case Test Name]
+[Same structure as Scenario 1]
+
+### Scenario 3: [Error Handling Test Name]
+[Same structure as Scenario 1]
+
+## Browser/Device Testing
+- List of browsers to test on
+- Mobile responsiveness checks if applicable
+- Performance considerations
+
+## Acceptance Criteria Verification
+- [Checklist of original requirements]
+- [Each requirement mapped to test scenario]
+
+# Required Output Format
+After analyzing the implementation, provide your test plan in this exact format:
+
+```json:testplan
+{
+  "feature_name": "Clear, concise feature name",
+  "implementation_summary": "Brief description of what was implemented",
+  "test_complexity": "simple|moderate|complex",
+  "estimated_test_time": "X minutes",
+  "requires_data_setup": true/false,
+  "confidence": 8
+}
+```
+
+Then provide the full test plan in markdown format with the structure above.
+
+# Key Guidelines
+1. **Be Specific**: "Click the blue Save button" not "save the form"
+2. **Verify Results**: Always include what the tester should see/expect
+3. **Cover Edge Cases**: Empty inputs, long text, special characters, etc.
+4. **Think Mobile**: Consider responsive design and touch interactions
+5. **Error Scenarios**: Test validation, network errors, permission issues
+6. **Performance**: Loading states, large data sets, slow connections
+7. **Accessibility**: Keyboard navigation, screen reader compatibility
+
+# Quality Standards
+- Each test scenario should be executable by a non-technical user
+- Instructions should be unambiguous and specific
+- Cover both positive and negative test cases
+- Include visual verification points (colors, text, layouts)
+- Test realistic user workflows, not just isolated features
+
+Your test plans enable confident feature releases by ensuring thorough validation."""
 
     def _create_isolated_workspace(self) -> str:
         """Create isolated git branch for workflow."""
@@ -695,6 +786,159 @@ Provide your structured JSON review - be concise and actionable.
             console.print("📋 Response preview:", full_response[-200:] if len(full_response) > 200 else full_response)
             return {"approval": False, "overall_assessment": f"Review failed - parsing error: {e}", "concerns": [f"Failed to parse review output: {e}"]}
     
+    async def _run_test_planner(self, implementation_data: Dict[str, Any], review_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Run test planner agent session."""
+        console.print("📋 Starting Test Planner Agent...")
+        
+        # Get git diff for test planning context
+        current_branch = self.repo.active_branch.name
+        diff_output = ""
+        
+        try:
+            # Get diff for understanding what was implemented
+            diff_output = self.repo.git.diff(
+                f'{self.base_branch}...{current_branch}',
+                '--', '.',
+                ':(exclude)wizardry/ui/frontend/.next/**',
+                ':(exclude)**/node_modules/**', 
+                ':(exclude)**/__pycache__/**',
+                ':(exclude)**/*.pyc',
+                ':(exclude)**/cache/**'
+            )
+            console.print(f"📋 Got diff for test planning ({len(diff_output)} chars)")
+            
+            if not diff_output.strip():
+                # Check for uncommitted changes as fallback
+                staged_diff = self.repo.git.diff('--cached')
+                unstaged_diff = self.repo.git.diff()
+                if staged_diff or unstaged_diff:
+                    diff_output = f"# Staged changes:\n{staged_diff}\n\n# Unstaged changes:\n{unstaged_diff}"
+                else:
+                    diff_output = "No code changes detected for test planning."
+            
+        except Exception as e:
+            console.print(f"⚠️ Error getting git diff for test planner: {e}")
+            diff_output = f"Error retrieving code changes: {str(e)}"
+
+        # Handle large diffs by saving to file
+        diff_file_path = None
+        diff_content_for_prompt = diff_output
+        
+        if len(diff_output) > 8000:
+            console.print("📋 Large diff detected - saving to temp file for test planner")
+            try:
+                diff_file_path = self.session_dir / "test_planning_diff.txt"
+                with open(diff_file_path, 'w') as f:
+                    f.write(diff_output)
+                console.print(f"📁 Saved diff to: {diff_file_path}")
+                
+                diff_content_for_prompt = f"[DIFF TOO LARGE - {len(diff_output)} chars]\nPlease use the Read tool to view: {diff_file_path}"
+            except Exception as e:
+                console.print(f"⚠️ Failed to save diff to file: {e}")
+                diff_content_for_prompt = diff_output[:4000] + f"\n\n... [TRUNCATED - showing first 4KB of {len(diff_output)} total chars] ..."
+
+        options = ClaudeCodeOptions(
+            system_prompt=self.test_planner_prompt,
+            max_turns=12,
+            allowed_tools=["Read", "Grep", "Bash", "LS"],
+            model="claude-3-5-sonnet-20241022",
+            cwd=str(self.repo_path),
+            permission_mode="acceptEdits"
+        )
+        
+        test_plan_prompt = f"""
+Please create a comprehensive test plan for this implemented feature:
+
+**Original Task**: {self.task}
+
+**Implementation Summary**: {json.dumps(implementation_data, indent=2)}
+
+**Review Results**: {json.dumps(review_data, indent=2)}
+
+**Code Changes**:
+```diff
+{diff_content_for_prompt}
+```
+
+**Instructions**: 
+Analyze the implementation and create a detailed test plan focusing on:
+
+1. **Understanding the Feature**: Study the code changes and original task to understand what was built
+2. **User Workflows**: Identify the primary user journeys this feature enables
+3. **Test Scenarios**: Create specific, actionable test cases for frontend validation
+4. **Edge Cases**: Consider error states, boundary conditions, and unusual inputs
+5. **Integration Points**: Test how this feature works with existing functionality
+
+Focus on creating tests that can be executed by non-technical users through the frontend interface. Include specific UI elements to interact with, expected visual feedback, and clear success criteria.
+
+Provide your structured JSON test plan data followed by the detailed markdown test plan.
+"""
+        
+        full_response = ""
+        async with ClaudeSDKClient(options=options) as client:
+            await client.query(test_plan_prompt)
+            
+            async for message in client.receive_response():
+                if hasattr(message, 'content'):
+                    for block in message.content:
+                        if hasattr(block, 'text'):
+                            text = block.text
+                            print(text, end='', flush=True)
+                            full_response += text
+                        elif hasattr(block, 'tool_use'):
+                            tool_break = f"\n\n[Tool: {block.tool_use.name}]\n"
+                            print(tool_break, end='', flush=True)
+                            full_response += tool_break
+                        elif hasattr(block, 'tool_result'):
+                            result_break = "\n\n"
+                            print(result_break, end='', flush=True) 
+                            full_response += result_break
+        
+        # Log the conversation
+        self._log_conversation("test_planner", test_plan_prompt, full_response)
+        
+        # Save the full test plan to a file for easy access
+        try:
+            test_plan_file = self.session_dir / "test_plan.md"
+            with open(test_plan_file, 'w') as f:
+                f.write(f"# Test Plan for: {self.task}\n\n")
+                f.write(f"**Generated**: {datetime.now().isoformat()}\n")
+                f.write(f"**Session ID**: {self.workflow_id}\n\n")
+                f.write("---\n\n")
+                f.write(full_response)
+            console.print(f"📋 Test plan saved to: {test_plan_file}")
+        except Exception as e:
+            console.print(f"⚠️ Failed to save test plan to file: {e}")
+        
+        # Extract structured output
+        try:
+            import re
+            json_match = re.search(r'```json:testplan\s*\n(.*?)\n```', full_response, re.DOTALL)
+            if json_match:
+                test_plan_data = json.loads(json_match.group(1))
+                console.print(f"✅ Test Planner completed - Feature: {test_plan_data.get('feature_name', 'Unknown')}")
+                console.print(f"📋 Complexity: {test_plan_data.get('test_complexity', 'Unknown')}, Est. Time: {test_plan_data.get('estimated_test_time', 'Unknown')}")
+                
+                # Add the full response as test plan content
+                test_plan_data["test_plan_content"] = full_response
+                test_plan_data["test_plan_generated"] = True
+                
+                return test_plan_data
+            else:
+                console.print("⚠️ No structured test plan output found")
+                return {
+                    "test_plan_generated": False, 
+                    "error": "No structured output found",
+                    "test_plan_content": full_response
+                }
+        except Exception as e:
+            console.print(f"⚠️ Error parsing test plan output: {e}")
+            return {
+                "test_plan_generated": False, 
+                "error": f"Parsing error: {e}",
+                "test_plan_content": full_response
+            }
+    
     def _create_pr(self):
         """Create GitHub PR for the implementation."""
         current_branch = self.repo.active_branch.name
@@ -1001,7 +1245,23 @@ Please fix these issues and commit your changes. Make sure to:
             
             if review_data.get("approval", False):
                 console.print("✅ Review approved!")
-                
+
+                # Run test planner after successful review
+                console.print("📋 Starting test planning phase...")
+                test_plan_data = {}
+                try:
+                    with console.status("📋 Test Planner analyzing implementation..."):
+                        test_plan_data = await self._run_test_planner(implementation_data, review_data)
+                    
+                    if test_plan_data.get("test_plan_generated", False):
+                        console.print("✅ Test plan generated successfully!")
+                        console.print(f"📋 Feature: {test_plan_data.get('feature_name', 'Unknown')}")
+                        console.print(f"📋 Test complexity: {test_plan_data.get('test_complexity', 'Unknown')}")
+                        console.print(f"📋 Estimated test time: {test_plan_data.get('estimated_test_time', 'Unknown')}")
+                    else:
+                        console.print("⚠️ Test plan generation had issues, but workflow continues")
+                except Exception as e:
+                    console.print(f"⚠️ Test planning failed: {e}")                
                 # Sync changes back to original repo if we're using a workspace copy
                 await self._sync_to_original_repo()
                 
@@ -1011,7 +1271,8 @@ Please fix these issues and commit your changes. Make sure to:
                 # Keep worktree for diff viewing - cleanup happens during session archive
                 
                 console.print("🎉 Workflow completed successfully!")
-                success = True
+                if test_plan_data.get("test_plan_generated", False):
+                    console.print("📋 Test plan is ready! Check the UI for detailed testing instructions.")                success = True
             else:
                 console.print("❌ Workflow failed after max iterations")
                 success = False
@@ -1023,7 +1284,10 @@ Please fix these issues and commit your changes. Make sure to:
             # Worktree cleanup handled during session archive, not here
                 
             # Update session status based on actual result
-            status = "completed" if success else "failed"
+            if success:
+                status = "ready_to_test" if ('test_plan_data' in locals() and test_plan_data.get("test_plan_generated", False)) else "completed"
+            else:
+                status = "failed"
             self._update_session_status(status)
             console.print(f"📊 Session status updated: {status}")
         

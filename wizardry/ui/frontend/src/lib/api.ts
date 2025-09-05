@@ -44,6 +44,17 @@ export interface CreateSessionRequest {
   max_iterations?: number
 }
 
+export interface TestPlanResponse {
+  feature_name: string
+  implementation_summary: string
+  test_complexity: string
+  estimated_test_time: string
+  requires_data_setup: boolean
+  confidence: number
+  test_plan_content: string
+  test_plan_generated: boolean
+}
+
 class ApiClient {
   private baseUrl: string
 
@@ -116,6 +127,10 @@ class ApiClient {
 
   async getRepoInfo(repoPath: string): Promise<RepoInfo> {
     return this.request<RepoInfo>(`/repos/info?repo_path=${encodeURIComponent(repoPath)}`)
+  }
+
+  async getTestPlan(sessionId: string): Promise<TestPlanResponse> {
+    return this.request<TestPlanResponse>(`/sessions/${sessionId}/test-plan`)
   }
 }
 

@@ -105,6 +105,17 @@ class ConversationResponse(BaseModel):
     conversation: List[ConversationEntry]
 
 
+class TestPlanResponse(BaseModel):
+    feature_name: str
+    implementation_summary: str
+    test_complexity: str
+    estimated_test_time: str
+    requires_data_setup: bool
+    confidence: int
+    test_plan_content: str
+    test_plan_generated: bool = True
+
+
 # Utility functions
 def get_session_registry_path() -> Path:
     """Get the session registry path."""
@@ -533,6 +544,56 @@ async def get_repo_info_endpoint(repo_path: str):
     if not repo_info:
         raise HTTPException(status_code=400, detail="Invalid repository path")
     return repo_info
+
+
+@app.get("/api/sessions/{session_id}/test-plan", response_model=TestPlanResponse)
+async def get_test_plan(session_id: str):
+    """Get test plan for a session."""
+    # Check if session exists
+    sessions = load_sessions()
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Look for test plan file
+    test_plan_file = Path(f"/tmp/wizardry-sessions/{session_id}/test_plan.md")
+    
+    if not test_plan_file.exists():
+        raise HTTPException(status_code=404, detail="Test plan not found")
+    
+    try:
+        test_plan_content = test_plan_file.read_text()
+        
+        # Try to extract structured data from test planner transcript
+        transcript_file = Path(f"/tmp/wizardry-sessions/{session_id}/transcripts/test_planner.md")
+        test_plan_data = {
+            "feature_name": "Feature Test Plan",
+            "implementation_summary": "Test plan generated for implementation",
+            "test_complexity": "moderate",
+            "estimated_test_time": "15 minutes",
+            "requires_data_setup": False,
+            "confidence": 8,
+            "test_plan_content": test_plan_content,
+            "test_plan_generated": True
+        }
+        
+        if transcript_file.exists():
+            transcript_content = transcript_file.read_text()
+            
+            # Try to extract JSON data from transcript
+            import re
+            json_match = re.search(r'```json:testplan\s*\n(.*?)\n```', transcript_content, re.DOTALL)
+            if json_match:
+                try:
+                    import json
+                    extracted_data = json.loads(json_match.group(1))
+                    test_plan_data.update(extracted_data)
+                except Exception:
+                    pass  # Use defaults if parsing fails
+        
+        return TestPlanResponse(**test_plan_data)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading test plan: {str(e)}")
 
 
 @app.websocket("/api/ws")
