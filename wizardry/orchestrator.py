@@ -111,18 +111,20 @@ Remember: Your job is to SHIP CODE, not just talk about it. Write files, commit 
 - **Security**: Are there any security concerns?
 
 # Required Output Format
-You MUST provide structured feedback:
+You MUST provide structured feedback. Be concise and focus on the most important points:
 
 ```json:review
 {
   "approval": false,
   "overall_assessment": "Brief summary of code quality",
-  "strengths": ["Specific positive aspects"],
-  "concerns": ["Specific issues that need addressing"],
-  "suggested_fixes": ["Concrete suggestions for improvement"],
+  "strengths": ["Top 2-3 positive aspects"],
+  "concerns": ["Top 2-3 issues that need addressing"],
+  "suggested_fixes": ["Top 2-3 concrete suggestions for improvement"],
   "confidence": 8
 }
 ```
+
+IMPORTANT: Keep your review focused and concise. Don't repeat the entire git diff in your response.
 
 # Approval Criteria
 Approve (`"approval": true`) only if:
@@ -381,7 +383,7 @@ Follow the guidelines in your system prompt and make sure to:
         
         options = ClaudeCodeOptions(
             system_prompt=self.reviewer_prompt,
-            max_turns=5,
+            max_turns=3,  # Reduced from 5 to keep reviews focused
             allowed_tools=["Read", "Grep", "Bash", "LS"],
             model="claude-3-5-sonnet-20241022",
             cwd=str(self.repo_path),  # Set working directory to repo
@@ -401,22 +403,32 @@ Please review this implementation:
 ```
 
 **Instructions**: 
-If the git diff shows "No code changes detected" or appears incomplete, use your available tools (Read, Grep, LS, Bash) to:
-1. Search for recently modified files related to the task
-2. Read the implementation files to understand what was actually implemented 
-3. Use `git log -1 --stat` or `git show --stat` to see what files were changed
-4. Use `git status` to check for any uncommitted changes
+Review the code changes efficiently:
 
-Then analyze the implementation for:
-- Code quality and maintainability
-- Adherence to existing patterns  
-- Correctness of the solution
-- Any potential improvements
+1. **If git diff is available**: Focus on the key changes and their impact
+2. **If no changes detected**: Use tools to investigate (git status, git log, Read files)
+3. **Keep review concise**: Focus on the most critical issues only
+4. **Prioritize**: Security > Correctness > Code Quality > Style
 
-Provide your structured review output as specified in your system prompt.
+Analyze for:
+- Does it solve the stated problem?
+- Are there security/correctness issues?
+- Does it follow existing patterns?
+- Any critical improvements needed?
+
+Provide your structured JSON review - be concise and actionable.
 """
         
-        console.print(f"📋 Sending review prompt with diff length: {len(diff_output)} characters")
+        # Truncate diff if too long to prevent reviewer timeout
+        if len(diff_output) > 5000:
+            console.print(f"📋 Diff is large ({len(diff_output)} chars), truncating for review")
+            diff_lines = diff_output.split('\n')
+            if len(diff_lines) > 200:
+                diff_output = '\n'.join(diff_lines[:100]) + f"\n\n... [Truncated {len(diff_lines)-200} lines] ...\n\n" + '\n'.join(diff_lines[-100:])
+            console.print(f"📋 Truncated diff to {len(diff_output)} characters")
+        else:
+            console.print(f"📋 Sending review prompt with diff length: {len(diff_output)} characters")
+        
         if diff_output and len(diff_output.strip()) > 0:
             console.print("✅ Diff contains actual code changes")
         else:
