@@ -28,14 +28,6 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
   const [discovering, setDiscovering] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load saved preferences from localStorage
-  useEffect(() => {
-    const savedRepo = localStorage.getItem('wizardry-last-repo')
-    const savedBranch = localStorage.getItem('wizardry-last-branch')
-    if (savedRepo) setSelectedRepo(savedRepo)
-    if (savedBranch) setSelectedBranch(savedBranch)
-  }, [])
-
   useEffect(() => {
     if (open) {
       discoverRepos()
@@ -47,6 +39,8 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
   const discoverRepos = async () => {
     try {
       setDiscovering(true)
+      setError(null)
+      
       const commonPaths = ['.', '..', process.env.HOME || '~']
       let allRepos: RepoInfo[] = []
       
@@ -55,23 +49,36 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
           const repos = await apiClient.discoverRepos(path)
           allRepos = [...allRepos, ...repos]
         } catch (err) {
-          // Ignore individual path errors
+          console.warn(`Failed to discover repos in ${path}:`, err)
         }
       }
       
-      // Remove duplicates based on path
       const uniqueRepos = allRepos.filter((repo, index, self) => 
         index === self.findIndex(r => r.path === repo.path)
       )
       
       setRepos(uniqueRepos)
       
-      if (uniqueRepos.length > 0) {
+      // Load saved preferences
+      const savedRepo = localStorage.getItem('wizardry-last-repo')
+      const savedBranch = localStorage.getItem('wizardry-last-branch')
+      
+      if (savedRepo && uniqueRepos.some(r => r.path === savedRepo)) {
+        setSelectedRepo(savedRepo)
+        const repo = uniqueRepos.find(r => r.path === savedRepo)
+        if (repo && savedBranch && repo.branches.includes(savedBranch)) {
+          setSelectedBranch(savedBranch)
+        } else if (repo) {
+          setSelectedBranch(repo.current_branch)
+        }
+      } else if (uniqueRepos.length > 0) {
         setSelectedRepo(uniqueRepos[0].path)
         setSelectedBranch(uniqueRepos[0].current_branch)
       }
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to discover repositories')
+      console.error('Repository discovery failed:', err)
+      setError(`Unable to discover repositories. ${err instanceof Error ? err.message : 'Please check if the backend is running.'}`)
     } finally {
       setDiscovering(false)
     }

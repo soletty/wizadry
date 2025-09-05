@@ -51,6 +51,7 @@ export default function Dashboard() {
     }
   }, [])
 
+
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     try {
