@@ -374,48 +374,44 @@ function ConversationTab({ conversation, loading }: {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 px-4 pt-4 pb-2">
-        <h3 className="font-semibold">💬 Agent Conversation</h3>
-        <p className="text-sm text-gray-600 mt-1">
-          Follow the conversation between implementer and reviewer agents
-        </p>
-      </div>
       
-      <div className="flex-1 mx-4 mb-4 bg-gradient-to-b from-blue-50 to-green-50 rounded-lg border flex flex-col min-h-0">
-        <div className="flex-1 overflow-auto p-4 space-y-6">
+      <div className="flex-1 mx-4 mb-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col min-h-0">
+        <div className="flex-1 overflow-auto p-8 space-y-6">
           {conversation.map((entry, index) => (
             <div key={index} className={`flex ${entry.agent === 'implementer' ? 'justify-start' : 'justify-end'}`}>
-              <div className={`max-w-4xl rounded-2xl p-4 shadow-sm ${
+              <div className={`max-w-4xl rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-200 ${
                 entry.agent === 'implementer' 
-                  ? 'bg-blue-100 border-l-4 border-blue-500' 
-                  : 'bg-green-100 border-l-4 border-green-500'
+                  ? 'bg-gradient-to-br from-blue-50 to-blue-100/30 border border-blue-100' 
+                  : 'bg-gradient-to-br from-emerald-50 to-emerald-100/30 border border-emerald-100'
               }`}>
                 {/* Agent Header */}
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center space-x-2">
-                    <span className="text-lg">
-                      {entry.agent === 'implementer' ? '🔧' : '🔍'}
-                    </span>
-                    <span className={`font-semibold text-sm uppercase tracking-wide ${
-                      entry.agent === 'implementer' ? 'text-blue-800' : 'text-green-800'
+                    <div className={`w-3 h-3 rounded-full shadow-sm ring-2 ring-white ${
+                      entry.agent === 'implementer' ? 'bg-gradient-to-r from-blue-400 to-blue-600' : 'bg-gradient-to-r from-emerald-400 to-emerald-600'
+                    }`}></div>
+                    <span className={`font-semibold text-sm capitalize tracking-wide ${
+                      entry.agent === 'implementer' ? 'text-blue-900' : 'text-emerald-900'
                     }`}>
                       {entry.agent}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-600 bg-white px-2 py-1 rounded-full">
+                  <span className={`text-xs font-medium px-3 py-1 rounded-full shadow-sm ${
+                    entry.agent === 'implementer' 
+                      ? 'text-blue-600 bg-white/60' 
+                      : 'text-emerald-600 bg-white/60'
+                  }`}>
                     {formatTimestamp(entry.timestamp)}
                   </span>
                 </div>
 
                 {/* Task Section */}
                 {entry.task && (
-                  <div className="mb-4">
-                    <h4 className={`text-sm font-medium mb-2 ${
-                      entry.agent === 'implementer' ? 'text-blue-700' : 'text-green-700'
-                    }`}>
-                      📋 Task:
-                    </h4>
-                    <div className="bg-white bg-opacity-70 rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap break-words border">
+                  <div className="mb-5">
+                    <div className={`text-sm font-semibold mb-3 ${
+                      entry.agent === 'implementer' ? 'text-blue-800' : 'text-emerald-800'
+                    }`}>Task</div>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 text-sm text-gray-800 whitespace-pre-wrap break-words border border-white/50 leading-relaxed shadow-sm">
                       {entry.task}
                     </div>
                   </div>
@@ -424,12 +420,10 @@ function ConversationTab({ conversation, loading }: {
                 {/* Response Section */}
                 {entry.response && (
                   <div>
-                    <h4 className={`text-sm font-medium mb-2 ${
-                      entry.agent === 'implementer' ? 'text-blue-700' : 'text-green-700'
-                    }`}>
-                      💬 Response:
-                    </h4>
-                    <div className="bg-white bg-opacity-70 rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap break-words border">
+                    <div className={`text-sm font-semibold mb-3 ${
+                      entry.agent === 'implementer' ? 'text-blue-800' : 'text-emerald-800'
+                    }`}>Response</div>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 text-sm text-gray-800 whitespace-pre-wrap break-words border border-white/50 leading-relaxed shadow-sm">
                       {entry.response}
                     </div>
                   </div>
