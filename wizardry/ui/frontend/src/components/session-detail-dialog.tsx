@@ -170,39 +170,37 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="overview" className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="implementation">Implementation</TabsTrigger>
             <TabsTrigger value="review">Review</TabsTrigger>
             <TabsTrigger value="changes">Git Changes</TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 overflow-hidden">
-            <TabsContent value="overview" className="h-full">
-              <OverviewTab session={session} />
-            </TabsContent>
+          <TabsContent value="overview" className="flex-1 mt-4 overflow-auto">
+            <OverviewTab session={session} />
+          </TabsContent>
 
-            <TabsContent value="implementation" className="h-full">
-              <TranscriptTab 
-                title="🔧 Implementer Agent"
-                transcript={transcripts?.implementer || ''}
-                loading={loading}
-              />
-            </TabsContent>
+          <TabsContent value="implementation" className="flex-1 mt-4 min-h-0">
+            <TranscriptTab 
+              title="🔧 Implementer Agent"
+              transcript={transcripts?.implementer || ''}
+              loading={loading}
+            />
+          </TabsContent>
 
-            <TabsContent value="review" className="h-full">
-              <TranscriptTab 
-                title="🔍 Reviewer Agent"
-                transcript={transcripts?.reviewer || ''}
-                loading={loading}
-              />
-            </TabsContent>
+          <TabsContent value="review" className="flex-1 mt-4 min-h-0">
+            <TranscriptTab 
+              title="🔍 Reviewer Agent"
+              transcript={transcripts?.reviewer || ''}
+              loading={loading}
+            />
+          </TabsContent>
 
-            <TabsContent value="changes" className="h-full">
-              <DiffTab diff={diff} loading={loading} />
-            </TabsContent>
-          </div>
+          <TabsContent value="changes" className="flex-1 mt-4 min-h-0">
+            <DiffTab diff={diff} loading={loading} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
@@ -319,14 +317,20 @@ function TranscriptTab({ title, transcript, loading }: {
   }
 
   return (
-    <div className="h-full flex flex-col p-4">
-      <h3 className="font-semibold mb-4">{title}</h3>
+    <div className="h-full flex flex-col">
+      <div className="flex-shrink-0 px-4 pt-4 pb-2">
+        <h3 className="font-semibold">{title}</h3>
+      </div>
       {transcript ? (
-        <div className="flex-1 bg-gray-50 rounded-lg p-4 overflow-auto">
-          <pre className="text-sm whitespace-pre-wrap font-mono">{transcript}</pre>
+        <div className="flex-1 mx-4 mb-4 bg-gray-50 rounded-lg border flex flex-col min-h-0">
+          <div className="flex-1 overflow-auto p-4">
+            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+              {transcript}
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-500">
+        <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
           <div className="text-center">
             <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <p>No transcript available yet</p>
@@ -348,14 +352,18 @@ function DiffTab({ diff, loading }: { diff: string; loading: boolean }) {
   }
 
   return (
-    <div className="h-full flex flex-col p-4">
-      <h3 className="font-semibold mb-4">📝 Code Changes</h3>
+    <div className="h-full flex flex-col">
+      <div className="flex-shrink-0 px-4 pt-4 pb-2">
+        <h3 className="font-semibold">📝 Code Changes</h3>
+      </div>
       {diff ? (
-        <div className="flex-1 bg-gray-900 rounded-lg p-4 overflow-auto">
-          <pre className="text-sm text-gray-100 font-mono whitespace-pre-wrap">{diff}</pre>
+        <div className="flex-1 mx-4 mb-4 bg-gray-900 rounded-lg border flex flex-col min-h-0">
+          <div className="flex-1 overflow-auto p-4">
+            <pre className="text-sm text-gray-100 font-mono whitespace-pre-wrap break-words leading-relaxed">{diff}</pre>
+          </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-500">
+        <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
           <div className="text-center">
             <Code2 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <p>No changes detected</p>
