@@ -475,11 +475,7 @@ Provide your structured JSON review - be concise and actionable.
             except Exception as e:
                 console.print(f"⚠️ Failed to save diff to file: {e}")
                 # Fall back to including truncated diff
-                diff_content_for_prompt = diff_output[:5000] + f"
-
-... [TRUNCATED - showing first 5KB of {len(diff_output)} total chars] ...
-
-Please use git diff command for full changes."
+                diff_content_for_prompt = diff_output[:5000] + f"\n\n... [TRUNCATED - showing first 5KB of {len(diff_output)} total chars] ...\n\nPlease use git diff command for full changes."
         
         if diff_output and len(diff_output.strip()) > 0:
             console.print("✅ Diff contains actual code changes")
