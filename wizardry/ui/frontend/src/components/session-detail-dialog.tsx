@@ -175,7 +175,7 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
           <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="conversation">Conversation</TabsTrigger>
-            <TabsTrigger value="changes">Git Changes</TabsTrigger>
+            <TabsTrigger value="changes">Diff</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="flex-1 mt-4 overflow-auto">
@@ -452,26 +452,93 @@ function DiffTab({ diff, loading }: { diff: string; loading: boolean }) {
     )
   }
 
+  if (!diff) {
+    return (
+      <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
+        <div className="text-center">
+          <Code2 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <p>No changes detected</p>
+          <p className="text-sm">Implementation may still be in progress</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 px-4 pt-4 pb-2">
-        <h3 className="font-semibold">📝 Code Changes</h3>
+      <div className="flex-1 mx-4 mb-4 bg-white rounded-lg border border-gray-200 flex flex-col min-h-0">
+        <div className="flex-1 overflow-auto">
+          <EnhancedDiffViewer diff={diff} />
+        </div>
       </div>
-      {diff ? (
-        <div className="flex-1 mx-4 mb-4 bg-gray-900 rounded-lg border flex flex-col min-h-0">
-          <div className="flex-1 overflow-auto p-4">
-            <pre className="text-sm text-gray-100 font-mono whitespace-pre-wrap break-words leading-relaxed">{diff}</pre>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
-          <div className="text-center">
-            <Code2 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p>No changes detected</p>
-            <p className="text-sm">Implementation may still be in progress</p>
-          </div>
-        </div>
-      )}
+    </div>
+  )
+}
+
+function EnhancedDiffViewer({ diff }: { diff: string }) {
+  const lines = diff.split('\n')
+  const sections: { type: 'file' | 'hunk' | 'line'; content: string; lineType?: 'added' | 'removed' | 'context' }[] = []
+  
+  for (const line of lines) {
+    if (line.startsWith('diff --git')) {
+      // Skip git diff headers
+      continue
+    } else if (line.startsWith('index ')) {
+      // Skip index lines
+      continue
+    } else if (line.startsWith('--- ') || line.startsWith('+++ ')) {
+      // Parse file paths and create file headers
+      if (line.startsWith('+++ ')) {
+        const filePath = line.replace('+++ b/', '').replace('+++ ', '')
+        if (filePath !== '/dev/null') {
+          sections.push({ type: 'file', content: filePath })
+        }
+      }
+    } else if (line.startsWith('@@')) {
+      // Skip hunk headers for now - we could parse these for more context later
+      continue
+    } else if (line.startsWith('+')) {
+      sections.push({ type: 'line', content: line.substring(1), lineType: 'added' })
+    } else if (line.startsWith('-')) {
+      sections.push({ type: 'line', content: line.substring(1), lineType: 'removed' })
+    } else if (line.trim() !== '') {
+      sections.push({ type: 'line', content: line, lineType: 'context' })
+    }
+  }
+
+  return (
+    <div className="font-mono text-sm">
+      {sections.map((section, index) => {
+        if (section.type === 'file') {
+          return (
+            <div key={index} className="sticky top-0 bg-gray-50 border-b border-gray-200 px-4 py-3 font-medium text-gray-700">
+              <FileText className="inline h-4 w-4 mr-2" />
+              {section.content}
+            </div>
+          )
+        } else if (section.type === 'line') {
+          const bgColor = section.lineType === 'added' 
+            ? 'bg-green-50 border-l-2 border-green-400' 
+            : section.lineType === 'removed' 
+            ? 'bg-red-50 border-l-2 border-red-400'
+            : 'bg-white'
+          
+          const textColor = section.lineType === 'added' 
+            ? 'text-green-800' 
+            : section.lineType === 'removed' 
+            ? 'text-red-800'
+            : 'text-gray-700'
+          
+          return (
+            <div key={index} className={`px-4 py-1 ${bgColor}`}>
+              <pre className={`whitespace-pre-wrap break-words leading-relaxed ${textColor}`}>
+                {section.content || ' '}
+              </pre>
+            </div>
+          )
+        }
+        return null
+      })}
     </div>
   )
 }
