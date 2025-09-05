@@ -8,18 +8,48 @@ allowed-tools: ["Bash", "Write", "Read", "Edit", "TodoWrite"]
 
 I'll start a multi-agent workflow with your arguments: $ARGUMENTS
 
-Let me set up the workflow session step by step:
+First, let me validate the arguments and environment:
 
 ```bash
-# Parse arguments  
+# Parse and validate arguments  
 ARGS="$ARGUMENTS"
 BRANCH=$(echo "$ARGS" | sed -n 's/.*--branch \([^ ]*\).*/\1/p')
 TASK=$(echo "$ARGS" | sed 's/.*--task //')
+
+# Validation
+if [[ -z "$BRANCH" ]]; then
+    echo "❌ Error: --branch is required"
+    echo "Usage: /workflow --branch <branch> --task <description>"
+    exit 1
+fi
+
+if [[ -z "$TASK" ]]; then
+    echo "❌ Error: --task is required"
+    echo "Usage: /workflow --branch <branch> --task <description>"
+    exit 1
+fi
+
+# Check if branch exists
+if ! git show-ref --verify --quiet refs/heads/$BRANCH && ! git show-ref --verify --quiet refs/remotes/origin/$BRANCH; then
+    echo "❌ Error: Branch '$BRANCH' does not exist"
+    echo "Available branches:"
+    git branch -a
+    exit 1
+fi
+
+# Check if working directory is clean
+if ! git diff --quiet HEAD; then
+    echo "⚠️ Warning: Working directory has uncommitted changes"
+    echo "Consider committing or stashing your changes before running workflow"
+    git status --porcelain
+fi
+
 WORKFLOW_ID="workflow-$(date +%s)-$(openssl rand -hex 3)"
 
 echo "🚀 Starting Wizardry workflow: $WORKFLOW_ID"
 echo "📋 Task: $TASK"  
 echo "🌿 Base branch: $BRANCH"
+echo "📂 Repository: $(pwd)"
 ```
 
 ```bash
@@ -39,8 +69,18 @@ EOF
 
 ```bash
 # Create isolated branch (keeps your current branch clean)
-git checkout -b "wizardry-$WORKFLOW_ID"
-echo "🌟 Created isolated branch: wizardry-$WORKFLOW_ID"
+echo "🔄 Switching to base branch: $BRANCH"
+git checkout $BRANCH
+
+if git checkout -b "wizardry-$WORKFLOW_ID"; then
+    echo "🌟 Created isolated branch: wizardry-$WORKFLOW_ID"
+else
+    echo "❌ Failed to create branch wizardry-$WORKFLOW_ID"
+    echo "This branch may already exist. Cleaning up..."
+    git branch -D "wizardry-$WORKFLOW_ID" 2>/dev/null || true
+    git checkout -b "wizardry-$WORKFLOW_ID"
+    echo "🌟 Created isolated branch: wizardry-$WORKFLOW_ID (after cleanup)"
+fi
 ```
 
 ```bash
@@ -84,17 +124,13 @@ Now I'll **automatically trigger the Implementer Agent**:
 
 /agents implementer
 
-I need you to implement a notification service system. Here's the complete task:
-
 **Task**: $TASK
 
-**Requirements**:
-- Create a notification service class that can store errors by user ID
-- Integrate with the existing user state manager and websocket system  
-- When a frontend connection connects via websocket, send stored errors as notifications
-- Clear errors from the notification center after sending
-- Follow existing codebase patterns and architecture
-- Make minimal, clean changes that fit the existing code style
-- Include the required JSON implementation output when done
+Please implement this task by following these steps:
+1. Analyze the existing codebase to understand patterns and architecture
+2. Implement the requested functionality with minimal, clean changes
+3. Test your implementation if testing infrastructure exists  
+4. Commit your changes with: git add . && git commit -m "descriptive message"
+5. Include the required JSON implementation output when done
 
-Please start by exploring the existing websocket and user management code to understand the architecture, then implement the notification service following those patterns.
+Focus on making something that works following existing patterns rather than perfect architecture.

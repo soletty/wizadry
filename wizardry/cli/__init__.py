@@ -314,7 +314,8 @@ def ui(port: int, api_port: int):
 @click.option('--branch', required=True, help='Base branch to work from')
 @click.option('--task', required=True, help='Task description for agents to implement')
 @click.option('--no-cleanup', is_flag=True, help='Keep workflow branch after completion')
-def run(repo: str, branch: str, task: str, no_cleanup: bool):
+@click.option('--auto-setup', is_flag=True, help='Automatically setup repository if not configured')
+def run(repo: str, branch: str, task: str, no_cleanup: bool, auto_setup: bool):
     """Run a complete multi-agent workflow on a repository."""
     import asyncio
     from ..orchestrator import run_orchestrator
@@ -330,10 +331,48 @@ def run(repo: str, branch: str, task: str, no_cleanup: bool):
         rprint(f"[red]Error: {repo_path} is not a git repository[/red]")
         sys.exit(1)
     
+    # Auto-setup if needed
     claude_dir = repo_path / ".claude"
     if not claude_dir.exists():
-        rprint(f"[red]Error: {repo_path} is not setup for Wizardry[/red]")
-        rprint("Run 'wizardry setup --repo .' first")
+        if auto_setup:
+            rprint(f"[yellow]⚙️ Repository not setup for Wizardry, auto-setting up...[/yellow]")
+            try:
+                # Copy templates
+                templates_dir = get_templates_dir() / ".claude"
+                shutil.copytree(templates_dir, claude_dir)
+                rprint(f"[green]✅ Repository setup completed[/green]")
+            except Exception as e:
+                rprint(f"[red]❌ Auto-setup failed: {e}[/red]")
+                rprint("Run 'wizardry setup --repo .' manually")
+                sys.exit(1)
+        else:
+            rprint(f"[red]Error: {repo_path} is not setup for Wizardry[/red]")
+            rprint("Options:")
+            rprint("  1. Run: wizardry setup --repo .")
+            rprint("  2. Use: wizardry run --auto-setup --branch ... --task ...")
+            sys.exit(1)
+    
+    # Validate branch exists
+    from git import Repo, InvalidGitRepositoryError
+    try:
+        git_repo = Repo(repo_path)
+        branch_names = [b.name for b in git_repo.branches]
+        remote_branches = []
+        try:
+            for remote in git_repo.remotes:
+                remote_branches.extend([ref.name.split('/')[-1] for ref in remote.refs])
+        except:
+            pass
+        
+        all_branches = set(branch_names + remote_branches)
+        if branch not in all_branches:
+            rprint(f"[red]Error: Branch '{branch}' not found[/red]")
+            rprint("[dim]Available branches:[/dim]")
+            for b in sorted(all_branches):
+                rprint(f"  - {b}")
+            sys.exit(1)
+    except InvalidGitRepositoryError:
+        rprint(f"[red]Error: {repo_path} is not a valid git repository[/red]")
         sys.exit(1)
     
     rprint(f"[bold]🚀 Starting Wizardry workflow[/bold]")

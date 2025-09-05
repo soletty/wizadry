@@ -272,6 +272,53 @@ Follow the guidelines in your system prompt and make sure to:
             console.print(f"⚠️ Error parsing implementer output: {e}")
             return {"ready_for_review": True, "rationale": "Implementation completed"}
     
+    async def _run_implementer_with_feedback(self, feedback_prompt: str) -> Dict[str, Any]:
+        """Run implementer agent with specific feedback to address."""
+        console.print("🔧 Running Implementer with feedback...")
+        
+        options = ClaudeCodeOptions(
+            system_prompt=self.implementer_prompt,
+            max_turns=10,
+            allowed_tools=["Read", "Write", "Edit", "Bash", "Grep", "LS", "MultiEdit"],
+            model="claude-3-5-sonnet-20241022",
+            cwd=str(self.repo_path),
+            permission_mode="acceptEdits"
+        )
+        
+        full_response = ""
+        async with ClaudeSDKClient(options=options) as client:
+            await client.query(feedback_prompt)
+            
+            async for message in client.receive_response():
+                if hasattr(message, 'content'):
+                    for block in message.content:
+                        if hasattr(block, 'text'):
+                            text = block.text
+                            print(text, end='', flush=True)
+                            full_response += text
+        
+        # Log the conversation
+        self._log_conversation("implementer_feedback", feedback_prompt, full_response)
+        
+        # Extract structured output (same logic as regular implementer)
+        try:
+            import re
+            json_match = re.search(r'```json:implementation\s*\n(.*?)\n```', full_response, re.DOTALL)
+            if json_match:
+                implementation_data = json.loads(json_match.group(1))
+                console.print("✅ Implementer feedback completed with structured output")
+                
+                # Validate that implementer actually made changes
+                self._validate_implementation_changes(implementation_data)
+                
+                return implementation_data
+            else:
+                console.print("⚠️ No structured output found in feedback response")
+                return {"ready_for_review": False, "rationale": "Failed to address feedback properly"}
+        except Exception as e:
+            console.print(f"⚠️ Error parsing implementer feedback output: {e}")
+            return {"ready_for_review": False, "rationale": "Failed to address feedback properly"}
+    
     async def _run_reviewer(self, implementation_data: Dict[str, Any]) -> Dict[str, Any]:
         """Run reviewer agent session."""
         console.print("🔍 Starting Reviewer Agent...")
@@ -388,11 +435,13 @@ Provide your structured review output as specified in your system prompt.
                 review_data = json.loads(json_match.group(1))
                 return review_data
             else:
-                console.print("⚠️ No structured review found, assuming approved")
-                return {"approval": True, "overall_assessment": "Review completed"}
+                console.print("⚠️ No structured review found - this is likely a problem!")
+                console.print("📋 Raw response preview:", full_response[:200] + "..." if len(full_response) > 200 else full_response)
+                return {"approval": False, "overall_assessment": "Review failed - no structured output", "concerns": ["No structured review output provided"]}
         except Exception as e:
             console.print(f"⚠️ Error parsing review output: {e}")
-            return {"approval": True, "overall_assessment": "Review completed"}
+            console.print("📋 Raw response preview:", full_response[:200] + "..." if len(full_response) > 200 else full_response)
+            return {"approval": False, "overall_assessment": f"Review failed - parsing error: {e}", "concerns": [f"Failed to parse review output: {e}"]}
     
     def _create_pr(self):
         """Create GitHub PR for the implementation."""
@@ -470,9 +519,42 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
                 console.print(f"❌ Review rejected (iteration {iteration}/{max_iterations})")
                 console.print("Feedback:", review_data.get("suggested_fixes", []))
                 
-                # TODO: Re-run implementer with feedback
-                # For now, break to avoid infinite loop
-                break
+                # Re-run implementer with feedback
+                console.print(f"🔄 Re-running implementer with feedback (iteration {iteration + 1})")
+                
+                # Create feedback prompt for implementer
+                feedback_prompt = f"""
+The reviewer has provided feedback on your implementation. Please address these issues:
+
+**Original Task**: {self.task}
+
+**Previous Implementation**: {json.dumps(implementation_data, indent=2)}
+
+**Reviewer Feedback**:
+- Overall Assessment: {review_data.get("overall_assessment", "Not provided")}
+- Concerns: {review_data.get("concerns", [])}
+- Suggested Fixes: {review_data.get("suggested_fixes", [])}
+
+Please fix these issues and commit your changes. Make sure to:
+1. Address all the concerns mentioned
+2. Follow the suggested fixes
+3. Test your changes
+4. Commit with git add && git commit
+5. Provide the required JSON implementation output
+"""
+                
+                with console.status(f"🔧 Implementer fixing issues (iteration {iteration + 1})..."):
+                    implementation_data = await self._run_implementer_with_feedback(feedback_prompt)
+                
+                if not implementation_data.get("ready_for_review", False):
+                    console.print(f"❌ Implementer failed to address feedback (iteration {iteration + 1})")
+                    break
+                
+                # Re-review the updated implementation
+                with console.status(f"🔍 Reviewer re-analyzing (iteration {iteration + 1})..."):
+                    review_data = await self._run_reviewer(implementation_data)
+                
+                iteration += 1
             
             if review_data.get("approval", False):
                 console.print("✅ Review approved!")
@@ -481,17 +563,21 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
                 pr_url = self._create_pr()
                 
                 console.print("🎉 Workflow completed successfully!")
-                return True
+                success = True
             else:
                 console.print("❌ Workflow failed after max iterations")
-                return False
+                success = False
                 
         except Exception as e:
             console.print(f"❌ Workflow error: {e}")
-            return False
+            success = False
         finally:
-            # Update session status
-            self._update_session_status("completed" if True else "failed")
+            # Update session status based on actual result
+            status = "completed" if success else "failed"
+            self._update_session_status(status)
+            console.print(f"📊 Session status updated: {status}")
+        
+        return success
     
     def _update_session_status(self, status: str):
         """Update session status in registry."""
