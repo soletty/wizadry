@@ -1,14 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, RefreshCw, Clock, CheckCircle, XCircle, Archive, Activity } from 'lucide-react'
+import { Plus, MoreHorizontal, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { apiClient, SessionInfo, WebSocketClient } from '@/lib/api'
-import { formatDate, getStatusColor } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import NewSessionDialog from '@/components/new-session-dialog'
 import SessionDetailDialog from '@/components/session-detail-dialog'
+
+interface GroupedSessions {
+  [key: string]: SessionInfo[]
+}
 
 export default function Dashboard() {
   const [sessions, setSessions] = useState<SessionInfo[]>([])
@@ -37,7 +40,7 @@ export default function Dashboard() {
     // Setup WebSocket for real-time updates
     const ws = new WebSocketClient((data) => {
       if (data.type === 'session_terminated' || data.type === 'workflow_completed' || data.type === 'session_archived') {
-        loadSessions() // Refresh sessions when updates arrive
+        loadSessions() // Auto-refresh when updates arrive
       }
     })
     ws.connect()
@@ -48,7 +51,8 @@ export default function Dashboard() {
     }
   }, [])
 
-  const handleDeleteSession = async (sessionId: string) => {
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
     try {
       await apiClient.deleteSession(sessionId)
       await loadSessions()
@@ -57,164 +61,126 @@ export default function Dashboard() {
     }
   }
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'success'
-      case 'failed': return 'destructive'
-      case 'in_progress': return 'pending'
-      case 'terminated': return 'secondary'
-      default: return 'outline'
+      case 'completed': return 'bg-green-100 text-green-800'
+      case 'failed': return 'bg-red-100 text-red-800'
+      case 'in_progress': return 'bg-blue-100 text-blue-800'
+      case 'terminated': return 'bg-gray-100 text-gray-800'
+      default: return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const stats = {
-    total: sessions.length,
-    active: sessions.filter(s => s.status === 'in_progress').length,
-    completed: sessions.filter(s => s.status === 'completed').length,
-    failed: sessions.filter(s => s.status === 'failed').length,
-  }
+  // Group sessions by repo/branch combination
+  const groupedSessions: GroupedSessions = sessions.reduce((acc, session) => {
+    const key = `${session.repo_path.split('/').pop()}/${session.base_branch}`
+    if (!acc[key]) {
+      acc[key] = []
+    }
+    acc[key].push(session)
+    return acc
+  }, {} as GroupedSessions)
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="h-6 w-6 animate-spin" />
-          <span>Loading sessions...</span>
+      <div className="flex h-screen items-center justify-center bg-white">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <div className="h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Plus className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
+          <p className="text-gray-500 mb-6 max-w-sm">
+            Create your first workflow to get started with automated code implementation.
+          </p>
+          <Button 
+            onClick={() => setNewSessionOpen(true)}
+            className="bg-black hover:bg-gray-800 text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Workflow
+          </Button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="border-b bg-white">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-semibold text-gray-900">Workflows</h1>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadSessions}
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              <Button onClick={() => setNewSessionOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Workflow
-              </Button>
-            </div>
-          </div>
+    <div className="min-h-screen bg-white">
+      {error && (
+        <div className="border-l-4 border-red-400 bg-red-50 p-4 mb-6">
+          <div className="text-sm text-red-700">{error}</div>
         </div>
-      </header>
+      )}
 
-      <main className="container mx-auto px-6 py-8">
-        {error && (
-          <div className="mb-6 rounded-md bg-red-50 border border-red-200 p-4">
-            <div className="flex items-center">
-              <XCircle className="h-5 w-5 text-red-400 mr-2" />
-              <span className="text-red-700">{error}</span>
+      <div className="max-w-4xl mx-auto p-6">
+        {Object.entries(groupedSessions).map(([repoBranch, sessionGroup]) => (
+          <div key={repoBranch} className="mb-8">
+            <div className="flex items-center space-x-2 mb-4">
+              <h2 className="text-sm font-medium text-gray-900">{repoBranch}</h2>
+              <span className="text-xs text-gray-400">
+                {sessionGroup.length} workflow{sessionGroup.length !== 1 ? 's' : ''}
+              </span>
             </div>
-          </div>
-        )}
-
-        {/* Stats Overview */}
-        {sessions.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
-              <span>{stats.total} total</span>
-              {stats.active > 0 && (
-                <span className="flex items-center space-x-1">
-                  <Activity className="h-3 w-3 text-blue-500" />
-                  <span>{stats.active} active</span>
-                </span>
-              )}
-              {stats.completed > 0 && <span className="text-green-600">{stats.completed} completed</span>}
-              {stats.failed > 0 && <span className="text-red-600">{stats.failed} failed</span>}
-            </div>
-          </div>
-        )}
-
-        {/* Sessions List */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Sessions</h2>
-            <span className="text-sm text-gray-500">{sessions.length} sessions</span>
-          </div>
-
-          {sessions.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="text-center">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
-                  <p className="text-gray-500 mb-6">
-                    Create your first workflow to get started.
-                  </p>
-                  <Button onClick={() => setNewSessionOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Workflow
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {sessions.map((session) => (
-                <Card key={session.session_id} className="hover:shadow-md transition-shadow cursor-pointer">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <CardTitle className="text-base font-medium">
-                            {session.task.length > 80 
-                              ? `${session.task.substring(0, 80)}...` 
-                              : session.task}
-                          </CardTitle>
-                          <Badge variant={getStatusBadgeVariant(session.status)}>
-                            {session.status}
-                          </Badge>
+            
+            <div className="space-y-3">
+              {sessionGroup.map((session) => (
+                <div
+                  key={session.session_id}
+                  onClick={() => setSelectedSession(session.session_id)}
+                  className="group p-4 border border-gray-200 rounded-lg hover:border-gray-300 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(session.status)}`}>
+                          {session.status === 'in_progress' ? 'running' : session.status}
                         </div>
-                        <CardDescription className="flex items-center space-x-4 text-sm">
-                          <span>{session.repo_path.split('/').pop()}</span>
-                          <span className="text-gray-400">•</span>
-                          <span>{session.base_branch}</span>
-                          <span className="text-gray-400">•</span>
-                          <span>{formatDate(session.created_at)}</span>
-                        </CardDescription>
+                        <span className="text-xs text-gray-400">
+                          {formatDate(session.created_at)}
+                        </span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedSession(session.session_id)}
-                        >
-                          View Details
-                        </Button>
-                        {session.status !== 'archived' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteSession(session.session_id)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <Archive className="h-4 w-4 mr-1" />
-                            Archive
-                          </Button>
-                        )}
-                      </div>
+                      <p className="text-sm text-gray-900 leading-5">
+                        {session.task.length > 120 
+                          ? `${session.task.substring(0, 120)}...` 
+                          : session.task}
+                      </p>
                     </div>
-                  </CardHeader>
-                </Card>
+                    <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => handleDeleteSession(session.session_id, e)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
-          )}
-        </div>
-      </main>
+          </div>
+        ))}
+      </div>
+
+      {/* Floating Action Button */}
+      <div className="fixed bottom-6 right-6">
+        <Button 
+          onClick={() => setNewSessionOpen(true)}
+          size="lg"
+          className="h-14 w-14 rounded-full bg-black hover:bg-gray-800 text-white shadow-lg"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      </div>
 
       {/* Dialogs */}
       <NewSessionDialog 

@@ -170,12 +170,11 @@ export default function NewSessionDialog({ open, onOpenChange, onSuccess }: NewS
             )}
           </div>
 
-          {/* Repository Info */}
-          {selectedRepoInfo && (
-            <div className="p-3 bg-gray-50 border rounded-md">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Current: <span className="font-medium">{selectedRepoInfo.current_branch}</span></span>
-                <span className="text-gray-600">{selectedRepoInfo.is_clean ? '✓ Clean' : '⚠ Uncommitted changes'}</span>
+          {/* Repository Warning */}
+          {selectedRepoInfo && !selectedRepoInfo.is_clean && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <div className="text-sm text-amber-700">
+                ⚠ Repository has uncommitted changes
               </div>
             </div>
           )}
