@@ -47,8 +47,11 @@ export interface CreateSessionRequest {
 class ApiClient {
   private baseUrl: string
 
-  constructor(baseUrl: string = 'http://localhost:8001/api') {
-    this.baseUrl = baseUrl
+  constructor(baseUrl?: string) {
+    // Try to get API URL from environment, fallback to default
+    this.baseUrl = baseUrl || 
+      process.env.NEXT_PUBLIC_API_URL || 
+      'http://localhost:8001/api'
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -118,8 +121,11 @@ export class WebSocketClient {
   private url: string
   private onMessage: (data: any) => void
 
-  constructor(onMessage: (data: any) => void) {
-    this.url = 'ws://localhost:8001/api/ws'
+  constructor(onMessage: (data: any) => void, wsUrl?: string) {
+    // Try to get WebSocket URL from environment, fallback to default
+    this.url = wsUrl || 
+      process.env.NEXT_PUBLIC_WS_URL || 
+      'ws://localhost:8001/api/ws'
     this.onMessage = onMessage
   }
 

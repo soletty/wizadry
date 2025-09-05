@@ -259,12 +259,27 @@ def ui(port: int, api_port: int):
         """Start the FastAPI backend server."""
         try:
             rprint("[blue]🔧 Starting API server...[/blue]")
-            subprocess.run([
-                "uvicorn", "main:app",
-                "--host", "0.0.0.0",
-                "--port", str(api_port),
-                "--reload"
-            ], cwd=backend_dir)
+            # Find the venv python and uvicorn
+            import sys
+            venv_python = sys.executable
+            venv_dir = Path(venv_python).parent
+            uvicorn_path = venv_dir / "uvicorn"
+            
+            if uvicorn_path.exists():
+                subprocess.run([
+                    str(uvicorn_path), "main:app",
+                    "--host", "0.0.0.0", 
+                    "--port", str(api_port),
+                    "--reload"
+                ], cwd=backend_dir)
+            else:
+                # Fallback: use python -m uvicorn
+                subprocess.run([
+                    venv_python, "-m", "uvicorn", "main:app",
+                    "--host", "0.0.0.0",
+                    "--port", str(api_port), 
+                    "--reload"
+                ], cwd=backend_dir)
         except Exception as e:
             rprint(f"[red]❌ Backend error: {e}[/red]")
     
@@ -273,9 +288,15 @@ def ui(port: int, api_port: int):
         try:
             time.sleep(2)  # Give backend time to start
             rprint("[blue]🎨 Starting frontend server...[/blue]")
+            
+            # Set environment variables for API connection
+            env = os.environ.copy()
+            env['NEXT_PUBLIC_API_URL'] = f'http://localhost:{api_port}/api'
+            env['NEXT_PUBLIC_WS_URL'] = f'ws://localhost:{api_port}/api/ws'
+            
             subprocess.run([
-                "npm", "run", "dev"
-            ], cwd=frontend_dir)
+                "npm", "run", "dev", "--", "--port", str(port)
+            ], cwd=frontend_dir, env=env)
         except Exception as e:
             rprint(f"[red]❌ Frontend error: {e}[/red]")
     
