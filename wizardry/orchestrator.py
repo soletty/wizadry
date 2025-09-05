@@ -470,6 +470,29 @@ Follow the guidelines in your system prompt and make sure to:
                 console.print(f"⚠️ All diff methods failed: {fallback_error}")
                 diff_output = f"Error retrieving code changes: {str(e)}\nPlease provide the diff manually for review."
         
+        # Handle large diffs by saving to file
+        console.print(f"📋 Preparing review with diff length: {len(diff_output)} characters")
+        
+        diff_file_path = None
+        diff_content_for_prompt = diff_output
+        
+        # If diff is large (>10KB), save to file and tell reviewer to read it
+        if len(diff_output) > 10000:
+            console.print("📋 Large diff detected - saving to temp file for reviewer")
+            try:
+                # Save diff to temp file in session directory
+                diff_file_path = self.session_dir / "current_diff.txt"
+                with open(diff_file_path, 'w') as f:
+                    f.write(diff_output)
+                console.print(f"📁 Saved diff to: {diff_file_path}")
+                
+                # Replace diff content in prompt with file reference
+                diff_content_for_prompt = f"[DIFF TOO LARGE - {len(diff_output)} chars]\nPlease use the Read tool to view: {diff_file_path}"
+            except Exception as e:
+                console.print(f"⚠️ Failed to save diff to file: {e}")
+                # Fall back to including truncated diff
+                diff_content_for_prompt = diff_output[:5000] + f"\n\n... [TRUNCATED - showing first 5KB of {len(diff_output)} total chars] ...\n\nPlease use git diff command for full changes."
+
         options = ClaudeCodeOptions(
             system_prompt=self.reviewer_prompt,
             max_turns=8,  # Allow enough turns for thorough review and tool usage
@@ -507,29 +530,6 @@ Analyze for:
 
 Provide your structured JSON review - be concise and actionable.
 """
-        
-        # Handle large diffs by saving to file
-        console.print(f"📋 Preparing review with diff length: {len(diff_output)} characters")
-        
-        diff_file_path = None
-        diff_content_for_prompt = diff_output
-        
-        # If diff is large (>10KB), save to file and tell reviewer to read it
-        if len(diff_output) > 10000:
-            console.print("📋 Large diff detected - saving to temp file for reviewer")
-            try:
-                # Save diff to temp file in session directory
-                diff_file_path = self.session_dir / "current_diff.txt"
-                with open(diff_file_path, 'w') as f:
-                    f.write(diff_output)
-                console.print(f"📁 Saved diff to: {diff_file_path}")
-                
-                # Replace diff content in prompt with file reference
-                diff_content_for_prompt = f"[DIFF TOO LARGE - {len(diff_output)} chars]\nPlease use the Read tool to view: {diff_file_path}"
-            except Exception as e:
-                console.print(f"⚠️ Failed to save diff to file: {e}")
-                # Fall back to including truncated diff
-                diff_content_for_prompt = diff_output[:5000] + f"\n\n... [TRUNCATED - showing first 5KB of {len(diff_output)} total chars] ...\n\nPlease use git diff command for full changes."
         
         if diff_output and len(diff_output.strip()) > 0:
             console.print("✅ Diff contains actual code changes")
@@ -628,23 +628,137 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
             
         try:
             import subprocess
+            import shutil
             current_branch = self.repo.active_branch.name
             
             console.print(f"🔄 Syncing changes from workspace to original repo...")
             
-            # Push the branch to original repo
+            # Switch to original repo and create/update the branch
+            original_repo = Repo(self.original_repo_path)
+            
+            # Fetch the workspace repo as a remote and merge the branch
+            workspace_remote_name = f"workspace_{self.workflow_id[:8]}"
+            
+            # Add workspace as temporary remote
             result = subprocess.run([
-                "git", "-C", str(self.repo_path), "push", 
-                str(self.original_repo_path), f"{current_branch}:{current_branch}"
+                "git", "-C", str(self.original_repo_path), "remote", "add", 
+                workspace_remote_name, str(self.repo_path)
+            ], capture_output=True, text=True)
+            
+            # Fetch the branch from workspace
+            result = subprocess.run([
+                "git", "-C", str(self.original_repo_path), "fetch", 
+                workspace_remote_name, current_branch
             ], check=True, capture_output=True, text=True)
+            
+            # Create/update the branch in original repo
+            result = subprocess.run([
+                "git", "-C", str(self.original_repo_path), "branch", "-f",
+                current_branch, f"{workspace_remote_name}/{current_branch}"
+            ], check=True, capture_output=True, text=True)
+            
+            # Clean up the temporary remote
+            subprocess.run([
+                "git", "-C", str(self.original_repo_path), "remote", "remove", 
+                workspace_remote_name
+            ], capture_output=True, text=True)
             
             console.print(f"✅ Successfully synced branch '{current_branch}' to original repo")
             
         except subprocess.CalledProcessError as e:
             console.print(f"⚠️ Failed to sync to original repo: {e.stderr}")
-            console.print(f"📋 Manual sync required: git push {self.original_repo_path} {current_branch}")
+            console.print(f"📋 Manual sync required - check workspace at: {self.repo_path}")
         except Exception as e:
             console.print(f"⚠️ Error during repo sync: {e}")
+    
+    @staticmethod
+    def archive_session(session_id: str, cleanup_branch: bool = True) -> bool:
+        """Archive a session and clean up all associated resources."""
+        registry_file = Path("/tmp/wizardry-sessions/registry.json")
+        archived_dir = Path("/tmp/wizardry-sessions/archived")
+        
+        try:
+            # Load session registry
+            if not registry_file.exists():
+                console.print(f"❌ Registry file not found")
+                return False
+                
+            with open(registry_file, 'r') as f:
+                registry = json.load(f)
+                
+            if session_id not in registry:
+                console.print(f"❌ Session {session_id} not found in registry")
+                return False
+                
+            session = registry[session_id]
+            session_dir = Path(session["workspace_path"])
+            original_repo_path = session.get("repo_path", "")
+            workspace_repo_path = session.get("workspace_repo_path", "")
+            
+            console.print(f"🗂️ Archiving session {session_id}...")
+            
+            # 1. Move session to archived directory
+            archived_dir.mkdir(exist_ok=True, parents=True)
+            archived_session_dir = archived_dir / session_id
+            
+            if session_dir.exists():
+                import shutil
+                if archived_session_dir.exists():
+                    shutil.rmtree(archived_session_dir)
+                shutil.move(str(session_dir), str(archived_session_dir))
+                console.print(f"📦 Moved session files to: {archived_session_dir}")
+            
+            # 2. Clean up branch if requested and if we have repo info
+            if cleanup_branch and original_repo_path and session.get("status") in ["completed", "failed"]:
+                try:
+                    # Find the branch name from session logs or use pattern
+                    branch_pattern = f"wizardry-*{session_id[-6:]}"  # Use last 6 chars of session ID
+                    
+                    import subprocess
+                    # List branches matching the pattern
+                    result = subprocess.run([
+                        "git", "-C", original_repo_path, "branch", "--list", branch_pattern
+                    ], capture_output=True, text=True)
+                    
+                    if result.returncode == 0 and result.stdout.strip():
+                        branches = [b.strip().lstrip('* ') for b in result.stdout.strip().split('\n')]
+                        for branch in branches:
+                            if branch and branch != session.get("base_branch"):
+                                # Delete the branch
+                                result = subprocess.run([
+                                    "git", "-C", original_repo_path, "branch", "-D", branch
+                                ], capture_output=True, text=True)
+                                
+                                if result.returncode == 0:
+                                    console.print(f"🗑️ Deleted branch: {branch}")
+                                else:
+                                    console.print(f"⚠️ Failed to delete branch {branch}: {result.stderr}")
+                                    
+                except Exception as e:
+                    console.print(f"⚠️ Error cleaning up branch: {e}")
+            
+            # 3. Clean up workspace repo if it exists and is different from original
+            if workspace_repo_path and workspace_repo_path != original_repo_path:
+                workspace_path = Path(workspace_repo_path)
+                if workspace_path.exists() and workspace_path != Path(original_repo_path):
+                    try:
+                        import shutil
+                        shutil.rmtree(workspace_path)
+                        console.print(f"🗑️ Cleaned up workspace repo: {workspace_path}")
+                    except Exception as e:
+                        console.print(f"⚠️ Failed to clean up workspace repo: {e}")
+            
+            # 4. Remove from active registry
+            del registry[session_id]
+            with open(registry_file, 'w') as f:
+                json.dump(registry, f, indent=2)
+            
+            console.print(f"✅ Session {session_id} archived successfully")
+            return True
+            
+        except Exception as e:
+            console.print(f"❌ Error archiving session {session_id}: {e}")
+            return False
     
     async def run_workflow(self) -> bool:
         """Run the complete workflow."""
