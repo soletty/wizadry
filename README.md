@@ -8,12 +8,17 @@ Automate code review workflows using Claude Code sub-agents with structured hand
 ```bash
 # Setup (first time only)
 ./wizardry/ui/setup.sh
-
-# Launch the web interface
-wizardry ui
+cd wizardry/ui/frontend
+pnpm i
+cd ../../..
+./venv/bin/wizardry ui
 
 # Open browser to http://localhost:3000
 # Beautiful TypeScript/Next.js interface for managing workflows
+
+# to see whats running
+lsof -i :8001 
+kill -9 abcdefgh
 ```
 
 ### Option 2: Command Line
