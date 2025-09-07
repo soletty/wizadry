@@ -351,6 +351,7 @@ The reviewer will check your git diff. Make it count."""
 - Is ALL unused code removed (no unused imports, variables, functions)?
 - Are there unnecessary comments (code should be self-documenting)?
 - Is the code clear over clever?
+- Are there any TODO/FIXME comments (not acceptable for production)?
 
 ## Error Handling Validation
 - Does the code fail explicitly with clear errors (never silently)?
@@ -384,9 +385,10 @@ If reviewing broker-frontend code:
 
 3. **Check Code Hygiene**
    - Zero tolerance for unused code
+   - Zero tolerance for TODO/FIXME comments
    - All errors handled explicitly
    - Descriptive naming throughout
-   - No TODO/FIXME comments
+   - Code must be production-ready
 
 4. **Validate Production Readiness**
    - Will this work reliably in production?
@@ -400,6 +402,7 @@ APPROVE ONLY WHEN ALL ARE TRUE:
 - ✓ Uses simple, robust approach (good 90/10 solution)
 - ✓ Follows existing codebase patterns precisely
 - ✓ Zero unused code remains
+- ✓ Zero TODO/FIXME comments remain
 - ✓ Errors handled explicitly (no silent failures)
 - ✓ Code is self-documenting with clear names
 - ✓ Production-ready (not a prototype)
@@ -414,6 +417,7 @@ MUST REJECT IF ANY ARE TRUE:
 - ✗ Unclear naming or unnecessary complexity
 - ✗ Added test/example files without being asked
 - ✗ Problem not actually solved (just similar functionality)
+- ✗ TODO/FIXME comments present (code must be production-ready)
 
 # REVIEW OUTPUT FORMAT
 
