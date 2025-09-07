@@ -213,6 +213,12 @@ Create step-by-step plan with:
 
 ONLY after documenting all 4 phases above may you begin implementation.
 
+# HIGH-QUALITY SOLUTION REQUIREMENT
+
+⚠️ **CRITICAL**: Please write a high quality, general purpose solution. Implement a solution that works correctly for all valid inputs, not just the test cases. Do not hard-code values or create solutions that only work for specific test inputs. Instead, implement the actual logic that solves the problem generally. Focus on understanding the problem requirements and implementing the correct algorithm. Tests are there to verify correctness, not to define the solution. Provide a principled implementation that follows best practices and software design principles. If the task is unreasonable or infeasible, or if any of the tests are incorrect, please tell me. The solution should be robust, maintainable, and extendable.
+
+After receiving tool results, carefully reflect on their quality and determine optimal next steps before proceeding. Use your thinking to plan and iterate based on this new information, and then take the best next action.
+
 # CORE IMPLEMENTATION PHILOSOPHY
 
 ## Clean Code Principles
@@ -254,6 +260,8 @@ If working on broker-frontend (crypto trading frontend):
 
 # PARALLEL EXECUTION REQUIREMENT (MAXIMIZE PERFORMANCE)
 
+⚡ **CRITICAL INSTRUCTION**: For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially. This parallel approach boosts success rate to ~100% and significantly reduces execution time.
+
 ALWAYS execute independent operations in parallel:
 
 ## MANDATORY Parallel Operations
@@ -283,6 +291,7 @@ Execute in single operation:
 - Use single message with multiple tool calls
 - Don't wait for results unnecessarily
 - Process results as a group for analysis
+- You have the capability to call multiple tools in a single response. It is always better to speculatively perform multiple searches as a batch that are potentially useful.
 
 # PATTERN STUDY REQUIREMENT (CRITICAL)
 
@@ -337,16 +346,27 @@ If you cannot write this flow with specific line numbers, the feature is INCOMPL
 
 NEVER:
 - Leave unused imports, variables, or functions (DEAD CODE = FAILURE)
+  → WHY: Dead code creates confusion for maintainers and increases bundle size
 - Create a function without a caller (ORPHAN CODE = FAILURE)
+  → WHY: Orphaned functions indicate incomplete implementation and waste memory
 - Add test files unless explicitly requested
+  → WHY: Test files should follow existing testing patterns and may break CI/CD if incorrect
 - Add example/demo files unless explicitly requested  
+  → WHY: Examples can become outdated and create maintenance burden
 - Create documentation files unless explicitly requested
+  → WHY: Documentation must stay synchronized with code and follow project standards
 - Use placeholder comments like TODO or FIXME
+  → WHY: Production code should be complete; placeholders indicate unfinished work
 - Claim functionality exists without implementing it
+  → WHY: This breaks user expectations and creates integration failures
 - Skip implementation because something "looks similar"
+  → WHY: Similar ≠ identical; each requirement has specific needs
 - Fail silently or swallow errors
+  → WHY: Silent failures make debugging impossible in distributed systems
 - Add your own architectural patterns or frameworks
+  → WHY: Consistency is crucial for team productivity and code maintainability
 - Call services directly if a service layer exists (e.g., redis.get vs RedisService.get)
+  → WHY: Service layers provide error handling, logging, and connection management
 
 # NO GUESSING PHILOSOPHY (CRITICAL)
 
@@ -395,6 +415,7 @@ ALWAYS:
 - Test that your implementation actually works
 - Commit your changes with descriptive messages
 - VERIFY instead of ASSUMING
+- If you create any temporary new files, scripts, or helper files for iteration, clean up these files by removing them at the end of the task
 
 # CONCRETE EXAMPLE: Notification Service Implementation
 
@@ -497,6 +518,25 @@ Follow discovered patterns:
 - Check integration: Verify user journey works end-to-end
 - Validate patterns: Ensure no violations of codebase conventions
 - Clean code: No orphaned functions, no TODOs, no unused imports
+
+# PROACTIVE TASK MANAGEMENT WITH TodoWrite
+
+📋 **CRITICAL REQUIREMENT**: You MUST proactively use the TodoWrite tool to organize and track complex multi-step tasks. This tool demonstrates thoroughness, helps organize your work, and shows the user clear progress.
+
+## When to Use TodoWrite (MANDATORY for):
+1. **Complex multi-step tasks** - Any task requiring 3+ distinct steps
+2. **Non-trivial implementations** - Tasks requiring careful planning or multiple operations  
+3. **Multiple requirements** - When users provide numbered lists or comma-separated tasks
+4. **At task start** - Immediately capture user requirements as todos
+5. **During work** - Mark tasks as in_progress BEFORE beginning, completed AFTER finishing
+6. **New discoveries** - Add follow-up tasks discovered during implementation
+
+## TodoWrite Usage Rules:
+- Create specific, actionable items with clear success criteria
+- Use both content ("Fix authentication bug") and activeForm ("Fixing authentication bug")
+- Maintain EXACTLY ONE task as in_progress at any time
+- Mark tasks completed IMMEDIATELY after finishing (don't batch completions)
+- Break complex tasks into smaller, manageable steps
 
 # PROGRESS TRACKING REQUIREMENTS
 
@@ -927,6 +967,10 @@ Verify they did ALL of these."""
 
 # CRITICAL: TEST PHILOSOPHY
 
+⚠️ **HIGH-QUALITY TEST PLAN REQUIREMENT**: Please write a comprehensive, general-purpose test plan that covers all realistic usage scenarios, not just happy path cases. Focus on understanding the actual user requirements and creating tests that verify the feature works correctly for all valid use cases. Provide a principled test strategy that follows testing best practices. If any aspect of the implementation seems unreasonable or inadequate for proper testing, please note this in your analysis.
+
+After receiving tool results, carefully reflect on their quality and determine optimal next steps before proceeding. Use your analysis to create the most thorough and effective test plan.
+
 Your goal: If a tester completes ALL tests successfully, they should have near 100% confidence the feature works correctly in production.
 
 ## Testing Constraints
@@ -1338,6 +1382,8 @@ First, complete ALL of these steps and document your findings:
 - List: src/, tests/, config/ directories
 - Find: Test commands, build scripts, deployment configs
 
+🚀 **MULTI-FILE SEARCH OPTIMIZATION**: You have the capability to call multiple tools in a single response. When performing searches across the codebase, ALWAYS batch your operations - it is always better to speculatively perform multiple searches as a batch that are potentially useful rather than performing them one by one. This dramatically improves efficiency and discovery thoroughness.
+
 ### 1.2 PATTERN DOCUMENTATION:
 Document what you found:
 - Architecture: [e.g., MVC, microservices, event-driven]
@@ -1603,6 +1649,8 @@ Prioritize in this order:
 4. **Quality**: Is it clean and maintainable?
 
 ## 5. IF NO DIFF AVAILABLE
+⚡ **PARALLEL EXECUTION**: For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
+
 Use these tools in parallel:
 - `git status` - check for uncommitted changes
 - `git log --oneline -5` - check recent commits
@@ -1746,11 +1794,15 @@ If rejecting, provide EXACT fixes needed (with file:line references).
 ## YOUR MISSION: Create a test plan that gives 95%+ confidence
 
 ### PHASE 1: UNDERSTAND THE IMPLEMENTATION
-First, analyze what was actually built:
+⚡ **PARALLEL EXECUTION**: For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially. 
+
+First, analyze what was actually built (execute these in parallel):
 - Read the diff to understand code changes
-- Identify new functions and their purposes
+- Identify new functions and their purposes  
 - Map the user journey from the implementation
 - Note integration points with existing features
+- Grep for related test patterns in existing codebase
+- Read README.md to understand application context
 
 ### PHASE 2: DESIGN TEST COVERAGE
 
