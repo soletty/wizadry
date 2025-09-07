@@ -176,9 +176,11 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
         )}
 
         {/* Task Description */}
-        <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="bg-gray-50 p-4 rounded-lg flex-shrink-0">
           <h3 className="font-medium mb-2">Task Description</h3>
-          <p className="text-gray-700">{session.task}</p>
+          <div className="max-h-32 overflow-y-auto">
+            <p className="text-gray-700 text-sm leading-relaxed">{session.task}</p>
+          </div>
         </div>
 
         {/* Main Content Tabs */}
@@ -198,19 +200,19 @@ export default function SessionDetailDialog({ sessionId, open, onOpenChange }: S
             <OverviewTab session={session} />
           </TabsContent>
 
-          <TabsContent value="conversation" className="flex-1 mt-4 min-h-0">
+          <TabsContent value="conversation" className="flex-1 mt-4 overflow-auto">
             <ConversationTab 
               conversation={conversation?.conversation || []}
               loading={loading}
             />
           </TabsContent>
 
-          <TabsContent value="changes" className="flex-1 mt-4 min-h-0">
+          <TabsContent value="changes" className="flex-1 mt-4 overflow-auto">
             <DiffTab diff={diff} loading={loading} />
           </TabsContent>
 
           {testPlan && (
-            <TabsContent value="test-plan" className="flex-1 mt-4 min-h-0">
+            <TabsContent value="test-plan" className="flex-1 mt-4 overflow-auto">
               <TestPlanTab testPlan={testPlan} loading={loading} />
             </TabsContent>
           )}
@@ -384,7 +386,7 @@ function ConversationTab({ conversation, loading }: {
 
   if (conversation.length === 0) {
     return (
-      <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
+      <div className="mx-4 mb-4 flex items-center justify-center text-gray-500 py-20">
         <div className="text-center">
           <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
           <p>No conversation available yet</p>
@@ -395,10 +397,8 @@ function ConversationTab({ conversation, loading }: {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      
-      <div className="flex-1 mx-4 mb-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col min-h-0">
-        <div className="flex-1 overflow-auto p-8 space-y-6">
+    <div className="mx-4 mb-4 bg-white rounded-2xl border border-gray-100 shadow-sm">
+      <div className="p-8 space-y-6">
           {conversation.map((entry, index) => (
             <div key={index} className={`flex ${entry.agent === 'implementer' ? 'justify-start' : 'justify-end'}`}>
               <div className={`max-w-4xl rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-200 ${
@@ -454,7 +454,6 @@ function ConversationTab({ conversation, loading }: {
             </div>
           ))}
         </div>
-      </div>
     </div>
   )
 }
@@ -470,7 +469,7 @@ function DiffTab({ diff, loading }: { diff: string; loading: boolean }) {
 
   if (!diff) {
     return (
-      <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
+      <div className="mx-4 mb-4 flex items-center justify-center text-gray-500 py-20">
         <div className="text-center">
           <Code2 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
           <p>No changes detected</p>
@@ -481,12 +480,8 @@ function DiffTab({ diff, loading }: { diff: string; loading: boolean }) {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 mx-4 mb-4 bg-white rounded-lg border border-gray-200 flex flex-col min-h-0">
-        <div className="flex-1 overflow-auto">
-          <EnhancedDiffViewer diff={diff} />
-        </div>
-      </div>
+    <div className="mx-4 mb-4 bg-white rounded-lg border border-gray-200">
+      <EnhancedDiffViewer diff={diff} />
     </div>
   )
 }
@@ -573,7 +568,7 @@ function TestPlanTab({ testPlan, loading }: {
 
   if (!testPlan) {
     return (
-      <div className="flex-1 mx-4 mb-4 flex items-center justify-center text-gray-500">
+      <div className="mx-4 mb-4 flex items-center justify-center text-gray-500 py-20">
         <div className="text-center">
           <ClipboardCheck className="h-12 w-12 mx-auto mb-4 text-gray-400" />
           <p>No test plan available</p>
@@ -619,7 +614,7 @@ function TestPlanTab({ testPlan, loading }: {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div>
       {/* Clean header */}
       <div className="mx-4 mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
         <div className="flex items-center justify-between">
@@ -639,7 +634,7 @@ function TestPlanTab({ testPlan, loading }: {
       </div>
 
       {/* Test content with proper frame */}
-      <div className="flex-1 mx-4 mb-4 overflow-auto">
+      <div className="mx-4 mb-4">
         <div className="border border-gray-200 rounded-lg bg-white p-6 shadow-sm prose prose-sm max-w-none">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
