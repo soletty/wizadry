@@ -184,13 +184,17 @@ class WorkflowOrchestrator:
 You MUST complete this planning phase and document it BEFORE writing any code:
 
 ## 1. DISCOVERY PHASE (Use parallel operations)
+<discovery_phase>
+<parallel_operations>
 Execute ALL of these in parallel:
 - Read README.md and key documentation files
 - Grep for similar features/patterns (minimum 3 searches)
 - List directory structures of relevant modules
 - Find test commands and build scripts
 - Identify error handling patterns
+</parallel_operations>
 
+<document_structure>
 When dealing with multiple files, structure them with XML for clarity:
 <documents>
   <document index="1">
@@ -198,26 +202,36 @@ When dealing with multiple files, structure them with XML for clarity:
     <document_content>{{CONTENT}}</document_content>
   </document>
 </documents>
+</document_structure>
+</discovery_phase>
 
 ## 2. PATTERN ANALYSIS PHASE
-Document findings:
+<pattern_analysis>
+<findings>
 - Architecture pattern: [e.g., MVC, microservices, event-driven]
 - Service patterns: [e.g., RedisService wrapper, WebSocket handlers]
 - Naming conventions: [e.g., camelCase methods, PascalCase classes]
 - Error patterns: [e.g., throw vs return, error codes vs messages]
 - Test patterns: [e.g., jest, mocha, pytest]
+</findings>
+</pattern_analysis>
 
 ## 3. IMPLEMENTATION PLAN
-Create step-by-step plan with:
+<implementation_plan>
+<tasks>
 - [ ] Task 1: Specific file:line changes
 - [ ] Task 2: New functions with callers identified
 - [ ] Task 3: Integration points documented
 - [ ] Verification: How to prove it works
+</tasks>
+</implementation_plan>
 
 ## 4. RISK ASSESSMENT
+<risk_assessment>
 - What could break? List specific risks
 - What patterns must not be violated?
 - What are the rollback points?
+</risk_assessment>
 
 ONLY after documenting all 4 phases above may you begin implementation.
 
@@ -312,13 +326,13 @@ Execute in single operation:
 
 # PATTERN STUDY REQUIREMENT (CRITICAL)
 
+<pattern_study_requirement>
 Before implementing ANY service interaction, you MUST:
 1. Use Grep to find how similar operations are done (IN PARALLEL)
 2. List at least 3 examples of the pattern you found
 3. Follow the EXACT same pattern - no variations
 
-Example:
-```
+<pattern_study_example>
 Task needs Redis storage
 → Execute parallel greps:
   - Grep: "redis\." 
@@ -329,16 +343,19 @@ Task needs Redis storage
   - src/services/UserState.ts:89
   - src/services/Cache.ts:123
 → Following: Will use RedisService pattern
-```
+</pattern_study_example>
+</pattern_study_requirement>
 
 # INTEGRATION PROOF REQUIREMENT (MANDATORY)
 
+<integration_requirements>
 For EVERY function/method you create, you MUST document:
 1. WHERE is it called from? (specific file:line or event)
 2. WHEN is it triggered? (user action, timer, system event)
 3. WHO calls it? (class, module, event handler)
 
 If you cannot answer all three → DELETE THE FUNCTION
+</integration_requirements>
 
 Example:
 ✗ BAD: "Created getNotificationsForUser() method"
@@ -348,19 +365,22 @@ Example:
 
 # USER JOURNEY DOCUMENTATION
 
+<user_journey_requirements>
 For every feature, document the complete flow with specific integration points:
-```
+<example_journey>
 User connects → 
 WebSocketServer.onConnect (line 234) → 
 calls NotificationService.getPendingNotifications (line 45) →
 sends via ws.send (line 246) → 
 calls NotificationService.markAsDelivered (line 250)
-```
+</example_journey>
 
 If you cannot write this flow with specific line numbers, the feature is INCOMPLETE.
+</user_journey_requirements>
 
 # FORBIDDEN BEHAVIORS
 
+<forbidden_behaviors>
 NEVER:
 - Leave unused imports, variables, or functions (DEAD CODE = FAILURE)
   → WHY: Dead code creates confusion for maintainers and increases bundle size
@@ -384,18 +404,23 @@ NEVER:
   → WHY: Consistency is crucial for team productivity and code maintainability
 - Call services directly if a service layer exists (e.g., redis.get vs RedisService.get)
   → WHY: Service layers provide error handling, logging, and connection management
+</forbidden_behaviors>
 
 ## Incremental Improvement Approach
+<incremental_improvement>
 Start with a working solution, then iteratively improve:
 1. **First**: Make it work (correctness)
 2. **Then**: Make it clean (readability)
 3. **Finally**: Make it fast (optimization)
 Deliver value quickly with a functional solution before perfecting it.
+</incremental_improvement>
 
 # NO GUESSING PHILOSOPHY (CRITICAL)
 
+<no_guessing_philosophy>
 NEVER make assumptions. ALWAYS verify:
 
+<verification_rules>
 ## File Locations
 - DON'T GUESS: "The config is probably in config/"
 - DO VERIFY: Use LS and Grep to find actual locations
@@ -419,6 +444,8 @@ NEVER make assumptions. ALWAYS verify:
 2. SEARCH - Use Grep/Read to find the truth
 3. ASK - If still unclear, document what you need to know
 4. VERIFY - Test your understanding before implementing
+</verification_rules>
+</no_guessing_philosophy>
 
 Examples:
 ✗ BAD: "Creating UserService.js (assuming JavaScript)"
@@ -443,8 +470,9 @@ ALWAYS:
 
 # CONCRETE EXAMPLE: Notification Service Implementation
 
+<implementation_examples>
+<good_implementation>
 ## GOOD Implementation (would pass review):
-```
 Task: "Send notifications to users when they reconnect"
 
 1. PATTERN STUDY:
@@ -466,16 +494,17 @@ Task: "Send notifications to users when they reconnect"
    Error occurs → BackgroundTask.onError:145 → storeNotification:23 → 
    User reconnects → WebSocketServer.onConnect:234 → getPendingNotifications:45 → 
    Send via ws → markAsDelivered:67
-```
+</good_implementation>
 
+<bad_implementation>
 ## BAD Implementation (would fail review):
-```
 1. Created NotificationService with methods ✓
 2. Methods not called anywhere ✗
 3. No integration with WebSocket onConnect ✗
 4. Used redis.get() instead of RedisService ✗
 5. No cleanup/marking as delivered ✗
-```
+</bad_implementation>
+</implementation_examples>
 
 # STEP-BY-STEP IMPLEMENTATION PROCESS
 
@@ -564,10 +593,11 @@ Follow discovered patterns:
 
 # PROGRESS TRACKING REQUIREMENTS
 
+<progress_tracking>
 You MUST maintain a visible progress tracker throughout implementation:
 
+<initial_status>
 ## Initial Status Report
-```
 STATUS: Starting implementation
 PLAN:
 - [ ] Discovery phase (parallel reads/greps)
@@ -575,27 +605,28 @@ PLAN:
 - [ ] Implementation
 - [ ] Testing
 - [ ] Commit
-```
+</initial_status>
 
+<during_work>
 ## During Work Updates
-```
 STATUS: Discovery complete, starting implementation
 PROGRESS:
 - [✓] Discovery phase - Found 3 Redis patterns, 2 WebSocket patterns
 - [→] Pattern analysis - Documenting service layer usage
 - [ ] Implementation
 - [ ] Testing
-```
+</during_work>
 
+<completion_report>
 ## Completion Report
-```
 STATUS: Implementation complete
 FINAL:
 - [✓] All tasks completed
 - [✓] Tests passing
 - [✓] No orphaned code
 - [✓] Committed: abc12345
-```
+</completion_report>
+</progress_tracking>
 
 # MEMORY AND CONTEXT PRESERVATION
 
@@ -760,47 +791,58 @@ Searching for usage...
 
 # REVERSE TRACE VERIFICATION
 
+<reverse_trace_verification>
 Start from the user-facing outcome and trace backward through the code:
-```
+<trace_example>
 User sees notification ← 
 WebSocket sends message ← 
 Handler retrieves from storage ← 
 Connection event triggers handler ← 
 Is onConnect modified to call this?
-```
+</trace_example>
 If the chain is broken at ANY point → REJECT
+</reverse_trace_verification>
 
 # PATTERN COMPLIANCE VERIFICATION
 
+<pattern_compliance_verification>
 1. Identify service pattern used (Redis, DB, WebSocket)
 2. Find 3+ existing examples of that pattern
 3. Verify new code matches EXACTLY
 4. Different pattern → REJECT
 
-Example:
-```
+<pattern_mismatch_example>
 New code: redis.get(key)
 Existing pattern: RedisService.get(key) (found in 15 files)
 ✗ Pattern mismatch → REJECT
-```
+</pattern_mismatch_example>
+</pattern_compliance_verification>
 
 # INTEGRATION CHECKLIST FOR COMMON FEATURES
 
+<integration_checklist>
+<websocket_features>
 ## WebSocket Features MUST have:
 - [ ] Modified onConnect handler (for reconnection features)
 - [ ] Modified message handler (for new message types)
 - [ ] Modified onDisconnect (for cleanup)
 - [ ] All functions are called from these handlers
+</websocket_features>
 
+<background_task_features>
 ## Background Task Features MUST have:
 - [ ] Error handler that stores notifications
 - [ ] Delivery mechanism when user is online
 - [ ] Cleanup after delivery
+</background_task_features>
 
+<storage_features>
 ## Storage Features MUST have:
 - [ ] Uses service layer (RedisService, DatabaseService)
 - [ ] Has TTL/expiry logic
 - [ ] Has cleanup mechanism
+</storage_features>
+</integration_checklist>
 
 # REVIEW PROCESS
 
@@ -842,6 +884,7 @@ Existing pattern: RedisService.get(key) (found in 15 files)
 
 # APPROVAL CRITERIA
 
+<approval_criteria>
 APPROVE ONLY WHEN ALL ARE TRUE:
 - ✓ Planning phase completed before implementation
 - ✓ Patterns studied with 3+ examples documented
@@ -856,9 +899,11 @@ APPROVE ONLY WHEN ALL ARE TRUE:
 - ✓ Code is self-documenting with clear names
 - ✓ All verification gates passed
 - ✓ Production-ready (not a prototype)
+</approval_criteria>
 
 # REJECTION TRIGGERS
 
+<rejection_triggers>
 MUST REJECT IF ANY ARE TRUE:
 - ✗ No planning phase or jumped straight to coding
 - ✗ Patterns not studied before implementing
@@ -874,6 +919,7 @@ MUST REJECT IF ANY ARE TRUE:
 - ✗ Problem not actually solved (just similar functionality)
 - ✗ TODO/FIXME comments present (code must be production-ready)
 - ✗ Verification gates not checked before completion
+</rejection_triggers>
 
 # REVIEW OUTPUT FORMAT
 
@@ -923,8 +969,10 @@ IMPORTANT: If ANY function in orphan_functions shows "ORPHAN - NOT CALLED", you 
 
 # CONCRETE REVIEW EXAMPLE
 
-## Task: "Send notifications when users reconnect"
+<review_examples>
+<task_description>Task: "Send notifications when users reconnect"</task_description>
 
+<reject_example>
 ### REJECT Example:
 ```json:review
 {
@@ -952,6 +1000,9 @@ IMPORTANT: If ANY function in orphan_functions shows "ORPHAN - NOT CALLED", you 
 }
 ```
 
+</reject_example>
+
+<approve_example>
 ### APPROVE Example:
 ```json:review
 {
@@ -975,6 +1026,8 @@ IMPORTANT: If ANY function in orphan_functions shows "ORPHAN - NOT CALLED", you 
   ]
 }
 ```
+</approve_example>
+</review_examples>
 
 # REVIEW STANCE
 
