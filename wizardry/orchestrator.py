@@ -722,7 +722,7 @@ The reviewer will check your git diff. Make it count."""
     
     def _load_reviewer_prompt(self) -> str:
         """Load reviewer agent system prompt."""
-        return """You are a principal engineer and technical lead responsible for maintaining code quality standards across a large engineering organization. Your mission is to ensure the code solves the problem correctly using appropriate patterns and quality standards.
+        return """You are a principal engineer reviewing code. Focus on correctness and clean implementation.
 
 # CRITICAL: REVIEW PHILOSOPHY
 
@@ -922,6 +922,8 @@ MUST REJECT IF ANY ARE TRUE:
 </rejection_triggers>
 
 # REVIEW OUTPUT FORMAT
+
+⚠️ CRITICAL: You MUST output the JSON review block below, even if your analysis is incomplete. If you run out of turns or time, output the JSON with what you've analyzed so far.
 
 After analyzing the git diff and implementation:
 
@@ -1470,7 +1472,7 @@ Remember: Your testing should give near 100% confidence this feature will work r
             system_prompt=self.implementer_prompt,
             max_turns=35,  # Increased to allow more complex implementations
             allowed_tools=["Read", "Write", "Edit", "Bash", "Grep", "LS", "MultiEdit"],
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             cwd=str(self.repo_path),  # Set working directory to repo
             permission_mode="acceptEdits"  # Critical: Auto-accept file edits
         )
@@ -1578,7 +1580,7 @@ PARALLEL OPERATIONS: Batch file reads and searches together.
             system_prompt=self.implementer_prompt,
             max_turns=35,  # Increased to allow more complex implementations  
             allowed_tools=["Read", "Write", "Edit", "Bash", "Grep", "LS", "MultiEdit"],
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             cwd=str(self.repo_path),
             permission_mode="acceptEdits"
         )
@@ -1706,9 +1708,9 @@ PARALLEL OPERATIONS: Batch file reads and searches together.
 
         options = ClaudeCodeOptions(
             system_prompt=self.reviewer_prompt,
-            max_turns=8,  # Allow enough turns for thorough review and tool usage
+            max_turns=20,  # Increased to ensure reviewer can complete tool use and analysis
             allowed_tools=["Read", "Grep", "Bash", "LS"],
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             cwd=str(self.repo_path),  # Set working directory to repo
             permission_mode="acceptEdits"  # Allow reviewing files
         )
@@ -1735,11 +1737,12 @@ Please review this implementation:
 
 IF ANY UNCHECKED → REJECT with reason: "No planning phase completed"
 
-## 2. ORPHAN CODE CHECK (MANDATORY)
+## 2. ORPHAN CODE CHECK (MANDATORY) 
 For EVERY new function in the diff:
-- Use Grep to find where it's called
+- Use Grep to find where it's called (LIMIT: Check top 3-5 functions only to avoid running out of turns)
 - If NOT called anywhere → IMMEDIATE REJECT
 - Document the caller in your review
+- If you're running low on turns, prioritize outputting the JSON review
 
 ## 3. CRITICAL VALIDATIONS
 ☐ Task actually solved (not just similar functionality)
@@ -1754,6 +1757,8 @@ Prioritize in this order:
 2. **Completeness**: Are all parts integrated?
 3. **Patterns**: Does it match existing code?
 4. **Quality**: Is it clean and maintainable?
+
+⚠️ **TURN MANAGEMENT**: If you reach turn 10+ and haven't output JSON yet, immediately output your review JSON with current findings.
 
 ## 5. IF NO DIFF AVAILABLE
 ⚡ **PARALLEL EXECUTION**: For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
@@ -1809,10 +1814,13 @@ If rejecting, provide EXACT fixes needed (with file:line references).
             else:
                 console.print("⚠️ No structured review found - response may be incomplete!")
                 console.print(f"📋 Response length: {len(full_response)} characters")
-                console.print("📋 Response preview:", full_response[-200:] if len(full_response) > 200 else full_response)
+                console.print(f"📋 Response preview: {full_response[:235] if len(full_response) > 235 else full_response}")
                 
+                # Check if response seems cut off mid-tool use
+                if "Let me" in full_response[-100:] or "I'll" in full_response[-100:]:
+                    return {"approval": False, "overall_assessment": "Review incomplete - response cut off during tool use", "concerns": ["Reviewer was cut off mid-analysis, likely hit token or tool use limit"]}
                 # If response looks truncated (ends without proper JSON), indicate incomplete review
-                if len(full_response) > 1000 and not full_response.endswith('```'):
+                elif len(full_response) > 1000 and not full_response.endswith('```'):
                     return {"approval": False, "overall_assessment": "Review incomplete - response was truncated", "concerns": ["Reviewer response was cut off mid-analysis"]}
                 else:
                     return {"approval": False, "overall_assessment": "Review failed - no structured output", "concerns": ["No structured review output provided"]}
@@ -1877,7 +1885,7 @@ If rejecting, provide EXACT fixes needed (with file:line references).
             system_prompt=self.test_planner_prompt,
             max_turns=12,
             allowed_tools=["Read", "Grep", "Bash", "LS"],
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             cwd=str(self.repo_path),
             permission_mode="acceptEdits"
         )
@@ -2276,7 +2284,7 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
                 review_data = await self._run_reviewer(implementation_data)
             
             # Check approval
-            max_iterations = 2
+            max_iterations = 3
             iteration = 1
             
             while not review_data.get("approval", False) and iteration <= max_iterations:

@@ -59,7 +59,7 @@ options = ClaudeCodeOptions(
     system_prompt=self.implementer_prompt,
     max_turns=10,
     allowed_tools=["Read", "Write", "Edit", "Bash", "Grep", "LS", "MultiEdit"],
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     cwd=str(self.repo_path),           # CRITICAL: Set working directory
     permission_mode="acceptEdits"       # CRITICAL: Auto-accept file operations
 )

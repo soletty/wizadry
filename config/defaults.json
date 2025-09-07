@@ -2,7 +2,7 @@
   "agent_configs": {
     "max_iterations": 2,
     "timeout_minutes": 30,
-    "model": "claude-3-5-sonnet-20241022"
+    "model": "claude-sonnet-4-20250514"
   },
   "session_configs": {
     "workspace_base": "/tmp/wizardry-sessions",
