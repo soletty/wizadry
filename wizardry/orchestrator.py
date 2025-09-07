@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any
 import tempfile
 import random
 import string
+import httpx
 
 from claude_code_sdk import ClaudeSDKClient, ClaudeCodeOptions
 from git import Repo
@@ -1643,7 +1644,7 @@ Please fix these issues and commit your changes. Make sure to:
         return success
     
     def _update_session_status(self, status: str):
-        """Update session status in registry."""
+        """Update session status in registry and broadcast to WebSocket clients."""
         registry_file = Path("/tmp/wizardry-sessions/registry.json")
         try:
             with open(registry_file, 'r') as f:
@@ -1654,8 +1655,28 @@ Please fix these issues and commit your changes. Make sure to:
                 
                 with open(registry_file, 'w') as f:
                     json.dump(registry, f, indent=2)
+                
+                # Broadcast status update to WebSocket clients
+                self._broadcast_status_update(status)
         except Exception:
             pass  # Session tracking is not critical
+
+    def _broadcast_status_update(self, status: str):
+        """Broadcast status update to WebSocket clients via API."""
+        try:
+            # Get API URL from environment or use default
+            api_url = os.environ.get('WIZARDRY_API_URL', 'http://localhost:8001/api')
+            
+            with httpx.Client(timeout=2.0) as client:
+                client.post(
+                    f"{api_url}/broadcast/status-update",
+                    json={
+                        "session_id": self.workflow_id,
+                        "status": status
+                    }
+                )
+        except Exception:
+            pass  # Broadcasting is not critical, don't fail the workflow
 
 
 async def run_orchestrator(repo_path: str, branch: str, task: str) -> bool:

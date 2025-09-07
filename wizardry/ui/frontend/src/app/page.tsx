@@ -39,7 +39,7 @@ export default function Dashboard() {
 
     // Setup WebSocket for real-time updates
     const ws = new WebSocketClient((data) => {
-      if (data.type === 'session_terminated' || data.type === 'workflow_completed' || data.type === 'session_archived') {
+      if (data.type === 'session_terminated' || data.type === 'workflow_completed' || data.type === 'session_archived' || data.type === 'status_updated') {
         loadSessions() // Auto-refresh when updates arrive
       }
     })

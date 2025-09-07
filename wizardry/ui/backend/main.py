@@ -596,6 +596,21 @@ async def get_test_plan(session_id: str):
         raise HTTPException(status_code=500, detail=f"Error reading test plan: {str(e)}")
 
 
+@app.post("/api/broadcast/status-update")
+async def broadcast_status_update(request: dict):
+    """Broadcast status update to all connected WebSocket clients."""
+    try:
+        message = json.dumps({
+            "type": "status_updated",
+            "session_id": request.get("session_id"),
+            "status": request.get("status")
+        })
+        await manager.broadcast(message)
+        return {"message": "Status update broadcasted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error broadcasting status update: {str(e)}")
+
+
 @app.websocket("/api/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates."""
