@@ -348,6 +348,41 @@ NEVER:
 - Add your own architectural patterns or frameworks
 - Call services directly if a service layer exists (e.g., redis.get vs RedisService.get)
 
+# NO GUESSING PHILOSOPHY (CRITICAL)
+
+NEVER make assumptions. ALWAYS verify:
+
+## File Locations
+- DON'T GUESS: "The config is probably in config/"
+- DO VERIFY: Use LS and Grep to find actual locations
+- DON'T ASSUME: "This looks like a React app"
+- DO CONFIRM: Check package.json for actual dependencies
+
+## Patterns and Conventions
+- DON'T GUESS: "They probably use camelCase"
+- DO VERIFY: Grep existing code for naming patterns
+- DON'T ASSUME: "Redis is probably available"
+- DO CONFIRM: Search for Redis usage in codebase
+
+## Integration Points
+- DON'T GUESS: "This should connect to WebSocket handler"
+- DO VERIFY: Find the actual handler and its signature
+- DON'T ASSUME: "The API endpoint is probably /api/users"
+- DO CONFIRM: Grep for actual endpoint definitions
+
+## When Uncertain
+1. STOP - Don't proceed with assumptions
+2. SEARCH - Use Grep/Read to find the truth
+3. ASK - If still unclear, document what you need to know
+4. VERIFY - Test your understanding before implementing
+
+Examples:
+✗ BAD: "Creating UserService.js (assuming JavaScript)"
+✓ GOOD: "Checked package.json, confirmed TypeScript, creating UserService.ts"
+
+✗ BAD: "Adding to controllers/ directory"
+✓ GOOD: "Found existing controllers in src/api/controllers/, adding there"
+
 # REQUIRED BEHAVIORS
 
 ALWAYS:
@@ -359,6 +394,7 @@ ALWAYS:
 - Throw errors explicitly rather than failing silently
 - Test that your implementation actually works
 - Commit your changes with descriptive messages
+- VERIFY instead of ASSUMING
 
 # CONCRETE EXAMPLE: Notification Service Implementation
 
@@ -1291,14 +1327,50 @@ Remember: Your testing should give near 100% confidence this feature will work r
         task_prompt = f"""
 Task: {self.task}
 
-Please analyze the existing codebase, understand the patterns, and implement the requested functionality. 
+⚠️ CRITICAL: You MUST complete the planning phase BEFORE writing any code.
 
-Follow the guidelines in your system prompt and make sure to:
-1. Study existing code patterns first
-2. Implement minimal, clean solution
-3. Test your implementation if possible
-4. Commit your changes when complete
-5. Include the required JSON implementation output
+## PHASE 1: MANDATORY PLANNING GATE
+First, complete ALL of these steps and document your findings:
+
+### 1.1 PARALLEL DISCOVERY (execute these simultaneously):
+- Read: README.md, package.json/requirements.txt, main entry files
+- Grep (3+ searches): Similar features, patterns, error handling
+- List: src/, tests/, config/ directories
+- Find: Test commands, build scripts, deployment configs
+
+### 1.2 PATTERN DOCUMENTATION:
+Document what you found:
+- Architecture: [e.g., MVC, microservices, event-driven]
+- Service patterns: [e.g., RedisService, WebSocket handlers]
+- Naming conventions: [specific examples from codebase]
+- Test approach: [commands and frameworks found]
+
+### 1.3 IMPLEMENTATION PLAN:
+Create specific task list:
+- [ ] Task 1: [file:line changes planned]
+- [ ] Task 2: [new functions with identified callers]
+- [ ] Task 3: [integration points to modify]
+- [ ] Verification: [how to prove it works]
+
+## PHASE 2: IMPLEMENTATION
+ONLY after completing Phase 1:
+- Follow the EXACT patterns you discovered
+- Track progress on each task
+- NO orphaned functions (every function must have a caller)
+- NO TODO/FIXME comments
+- Test your implementation
+
+## PHASE 3: COMMIT & DOCUMENT
+- Commit with descriptive message
+- Provide the required JSON output with:
+  - call_graph (no empty arrays)
+  - patterns_studied (3+ examples)
+  - integration_points (specific line numbers)
+  - user_journey (complete flow)
+
+NEVER GUESS: If unsure about anything, use tools to verify first.
+PROGRESS TRACKING: Update task status as you work.
+PARALLEL OPERATIONS: Batch file reads and searches together.
 """
         
         full_response = ""
@@ -1500,21 +1572,45 @@ Please review this implementation:
 {diff_content_for_prompt}
 ```
 
-**Instructions**: 
-Review the code changes efficiently:
+⚠️ CRITICAL REVIEW CHECKLIST:
 
-1. **If git diff is available**: Focus on the key changes and their impact
-2. **If no changes detected**: Use tools to investigate (git status, git log, Read files)
-3. **Keep review concise**: Focus on the most critical issues only
-4. **Prioritize**: Security > Correctness > Code Quality > Style
+## 1. PLANNING PHASE VERIFICATION (GATE CHECK)
+☐ Did implementer show evidence of discovery phase?
+☐ Were patterns studied with 3+ examples?
+☐ Was parallel execution used for efficiency?
+☐ Is there a documented implementation plan?
 
-Analyze for:
-- Does it solve the stated problem?
-- Are there security/correctness issues?
-- Does it follow existing patterns?
-- Any critical improvements needed?
+IF ANY UNCHECKED → REJECT with reason: "No planning phase completed"
 
-Provide your structured JSON review - be concise and actionable.
+## 2. ORPHAN CODE CHECK (MANDATORY)
+For EVERY new function in the diff:
+- Use Grep to find where it's called
+- If NOT called anywhere → IMMEDIATE REJECT
+- Document the caller in your review
+
+## 3. CRITICAL VALIDATIONS
+☐ Task actually solved (not just similar functionality)
+☐ No TODO/FIXME comments remain
+☐ No unused imports/variables/functions
+☐ Follows discovered patterns exactly
+☐ All integration points connected
+
+## 4. REVIEW APPROACH
+Prioritize in this order:
+1. **Correctness**: Does it solve the exact problem?
+2. **Completeness**: Are all parts integrated?
+3. **Patterns**: Does it match existing code?
+4. **Quality**: Is it clean and maintainable?
+
+## 5. IF NO DIFF AVAILABLE
+Use these tools in parallel:
+- `git status` - check for uncommitted changes
+- `git log --oneline -5` - check recent commits
+- `git diff --cached` - check staged changes
+- Read modified files directly
+
+Provide your structured JSON review. Be SPECIFIC about issues.
+If rejecting, provide EXACT fixes needed (with file:line references).
 """
         
         if diff_output and len(diff_output.strip()) > 0:
@@ -1632,31 +1728,72 @@ Provide your structured JSON review - be concise and actionable.
         )
         
         test_plan_prompt = f"""
-Please create a comprehensive test plan for this implemented feature:
+🧪 TEST PLAN GENERATION - Create comprehensive testing strategy
 
 **Original Task**: {self.task}
 
-**Implementation Summary**: {json.dumps(implementation_data, indent=2)}
+**What Was Built**: 
+{json.dumps(implementation_data.get('rationale', 'See implementation details'), indent=2)}
 
-**Review Results**: {json.dumps(review_data, indent=2)}
+**Review Approval**: {review_data.get('approval', False)}
+**Review Strengths**: {review_data.get('strengths', [])}
 
 **Code Changes**:
 ```diff
 {diff_content_for_prompt}
 ```
 
-**Instructions**: 
-Analyze the implementation and create a detailed test plan focusing on:
+## YOUR MISSION: Create a test plan that gives 95%+ confidence
 
-1. **Understanding the Feature**: Study the code changes and original task to understand what was built
-2. **User Workflows**: Identify the primary user journeys this feature enables
-3. **Test Scenarios**: Create specific, actionable test cases for frontend validation
-4. **Edge Cases**: Consider error states, boundary conditions, and unusual inputs
-5. **Integration Points**: Test how this feature works with existing functionality
+### PHASE 1: UNDERSTAND THE IMPLEMENTATION
+First, analyze what was actually built:
+- Read the diff to understand code changes
+- Identify new functions and their purposes
+- Map the user journey from the implementation
+- Note integration points with existing features
 
-Focus on creating tests that can be executed by non-technical users through the frontend interface. Include specific UI elements to interact with, expected visual feedback, and clear success criteria.
+### PHASE 2: DESIGN TEST COVERAGE
 
-Provide your structured JSON test plan data followed by the detailed markdown test plan.
+#### Critical Path Tests (MUST PASS):
+1. **Happy Path**: Primary user flow works perfectly
+2. **Data Persistence**: Changes survive refresh/reload
+3. **Integration**: Works with existing features
+
+#### Reliability Tests:
+4. **Network Issues**: Offline/slow connection handling
+5. **Concurrent Use**: Multiple tabs/users
+6. **Extended Sessions**: Long-running stability
+
+#### Boundary Tests:
+7. **Input Validation**: Edge cases, limits, invalid data
+8. **Browser Compatibility**: Chrome, Firefox, Safari, Edge
+9. **Responsive Design**: Mobile, tablet, desktop
+
+#### Performance Tests:
+10. **Load Time**: Initial and interaction performance
+11. **Scale**: Handle expected data volumes
+
+### PHASE 3: CREATE ACTIONABLE TESTS
+
+For EACH test, specify:
+- EXACT UI elements to interact with ("Click the blue 'Submit' button in top-right")
+- PRECISE expected behavior ("Modal appears within 2 seconds")
+- CLEAR success criteria ("Data appears in table with green checkmark")
+- SPECIFIC failure indicators ("Red error message or spinner lasting >5 seconds")
+
+### IMPORTANT CONSTRAINTS:
+- Tests must be executable through UI only (no backend access)
+- Non-technical users should understand instructions
+- Include keyboard/accessibility testing
+- Cover both positive and negative scenarios
+- Test recovery from errors
+
+Provide:
+1. JSON metadata (feature_name, complexity, estimated_time, etc.)
+2. Detailed markdown test plan with numbered steps
+3. Confidence score after all tests pass
+
+Remember: If someone completes ALL your tests successfully, they should be confident deploying to production.
 """
         
         full_response = ""
@@ -1992,23 +2129,58 @@ Full agent conversations available at: `/tmp/wizardry-sessions/{self.workflow_id
                 
                 # Create feedback prompt for implementer
                 feedback_prompt = f"""
-The reviewer has provided feedback on your implementation. Please address these issues:
+⚠️ REVISION REQUIRED - Iteration {iteration + 1}/{max_iterations}
+
+The reviewer found issues that must be fixed before approval.
 
 **Original Task**: {self.task}
 
-**Previous Implementation**: {json.dumps(implementation_data, indent=2)}
+**What You Implemented Previously**:
+{json.dumps(implementation_data, indent=2)}
 
-**Reviewer Feedback**:
+**CRITICAL ISSUES TO FIX**:
+
+## Reviewer's Specific Concerns:
+{chr(10).join(f"- ✗ {concern}" for concern in review_data.get("concerns", []))}
+
+## Required Fixes (MUST complete ALL):
+{chr(10).join(f"- [ ] {fix}" for fix in review_data.get("suggested_fixes", []))}
+
+## Additional Context:
 - Overall Assessment: {review_data.get("overall_assessment", "Not provided")}
-- Concerns: {review_data.get("concerns", [])}
-- Suggested Fixes: {review_data.get("suggested_fixes", [])}
+- Approval Status: {review_data.get("approval", False)}
 
-Please fix these issues and commit your changes. Make sure to:
-1. Address all the concerns mentioned
-2. Follow the suggested fixes
-3. Test your changes
-4. Commit with git add && git commit
-5. Provide the required JSON implementation output
+## YOUR REVISION APPROACH:
+
+1. **UNDERSTAND THE ISSUES**:
+   - Read each concern carefully
+   - Use Grep/Read to verify the problems
+   - Don't assume - verify everything
+
+2. **TRACK YOUR FIXES**:
+   Mark each fix as you complete it:
+   - [✓] Fixed orphaned function by adding caller at line X
+   - [✓] Removed TODO comment from file Y
+   - [✓] Updated pattern to match existing code
+
+3. **VERIFY BEFORE COMMITTING**:
+   - Run tests if available
+   - Check no new orphaned functions
+   - Ensure all fixes are addressed
+
+4. **COMMIT AND DOCUMENT**:
+   - Use clear commit message: "fix: address review feedback - [summary]"
+   - Update JSON output with changes made
+   - Document what was fixed and how
+
+REMEMBER:
+- The reviewer will check if you ACTUALLY fixed the issues
+- Don't just claim fixes - implement them
+- Every function needs a caller
+- Follow existing patterns exactly
+- NO TODO/FIXME comments
+
+Provide updated JSON implementation output when complete.
 """
                 
                 with console.status(f"🔧 Implementer fixing issues (iteration {iteration + 1})..."):
