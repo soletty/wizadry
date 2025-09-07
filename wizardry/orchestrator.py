@@ -233,10 +233,57 @@ If working on broker-frontend (crypto trading frontend):
 - **WebSockets**: Automatic reconnection, component-specific subscriptions
 - **Types**: In `src/shared/types/` and `src/types/`
 
+# PATTERN STUDY REQUIREMENT (CRITICAL)
+
+Before implementing ANY service interaction, you MUST:
+1. Use Grep to find how similar operations are done
+2. List at least 3 examples of the pattern you found
+3. Follow the EXACT same pattern - no variations
+
+Example:
+```
+Task needs Redis storage
+→ Grep: "redis\." or "Redis" to find usage patterns
+→ Found: All calls use RedisService.get(), never redis.get()
+  - src/services/OrderService.ts:45
+  - src/services/UserState.ts:89
+  - src/services/Cache.ts:123
+→ Following: Will use RedisService pattern
+```
+
+# INTEGRATION PROOF REQUIREMENT (MANDATORY)
+
+For EVERY function/method you create, you MUST document:
+1. WHERE is it called from? (specific file:line or event)
+2. WHEN is it triggered? (user action, timer, system event)
+3. WHO calls it? (class, module, event handler)
+
+If you cannot answer all three → DELETE THE FUNCTION
+
+Example:
+✗ BAD: "Created getNotificationsForUser() method"
+✓ GOOD: "Created getNotificationsForUser() called by:
+  - WebSocketServer.onConnect at line 234 (when user connects)
+  - NotificationPoller.check at line 89 (every 30 seconds)"
+
+# USER JOURNEY DOCUMENTATION
+
+For every feature, document the complete flow with specific integration points:
+```
+User connects → 
+WebSocketServer.onConnect (line 234) → 
+calls NotificationService.getPendingNotifications (line 45) →
+sends via ws.send (line 246) → 
+calls NotificationService.markAsDelivered (line 250)
+```
+
+If you cannot write this flow with specific line numbers, the feature is INCOMPLETE.
+
 # FORBIDDEN BEHAVIORS
 
 NEVER:
-- Leave unused imports, variables, or functions
+- Leave unused imports, variables, or functions (DEAD CODE = FAILURE)
+- Create a function without a caller (ORPHAN CODE = FAILURE)
 - Add test files unless explicitly requested
 - Add example/demo files unless explicitly requested  
 - Create documentation files unless explicitly requested
@@ -245,6 +292,7 @@ NEVER:
 - Skip implementation because something "looks similar"
 - Fail silently or swallow errors
 - Add your own architectural patterns or frameworks
+- Call services directly if a service layer exists (e.g., redis.get vs RedisService.get)
 
 # REQUIRED BEHAVIORS
 
@@ -258,6 +306,42 @@ ALWAYS:
 - Test that your implementation actually works
 - Commit your changes with descriptive messages
 
+# CONCRETE EXAMPLE: Notification Service Implementation
+
+## GOOD Implementation (would pass review):
+```
+Task: "Send notifications to users when they reconnect"
+
+1. PATTERN STUDY:
+   - Grepped for WebSocket patterns
+   - Found onConnect handler in WebSocketServer.ts:234
+   - Found Redis usage via RedisService in 15+ files
+
+2. IMPLEMENTATION:
+   - Created NotificationService.ts with store/retrieve methods
+   - Modified WebSocketServer.onConnect to call getPendingNotifications
+   - Added markAsDelivered after successful send
+
+3. CALL GRAPH:
+   - storeNotification: ["BackgroundTask.onError:tasks.ts:145"]
+   - getPendingNotifications: ["WebSocketServer.onConnect:ws.ts:234"]
+   - markAsDelivered: ["WebSocketServer.onConnect:ws.ts:246"]
+
+4. USER JOURNEY:
+   Error occurs → BackgroundTask.onError:145 → storeNotification:23 → 
+   User reconnects → WebSocketServer.onConnect:234 → getPendingNotifications:45 → 
+   Send via ws → markAsDelivered:67
+```
+
+## BAD Implementation (would fail review):
+```
+1. Created NotificationService with methods ✓
+2. Methods not called anywhere ✗
+3. No integration with WebSocket onConnect ✗
+4. Used redis.get() instead of RedisService ✗
+5. No cleanup/marking as delivered ✗
+```
+
 # STEP-BY-STEP IMPLEMENTATION PROCESS
 
 ## Phase 1: Understanding (MANDATORY)
@@ -265,6 +349,7 @@ ALWAYS:
 2. Explore project structure with LS and Grep
 3. Find similar features/patterns in the codebase
 4. Identify conventions and patterns to follow
+5. Use Grep to find ALL integration points needed
 
 ## Phase 2: Planning
 5. Decompose the task into simple components
@@ -312,6 +397,19 @@ Before marking ready_for_review=true:
   "rationale": "What you implemented and why this approach",
   "files_modified": ["list of changed files"],
   "patterns_followed": "Which existing patterns you identified and followed",
+  "call_graph": {
+    "functionName": ["CallerClass.method:file.ts:lineNumber"],
+    "anotherFunction": ["EventHandler.onEvent:file.ts:lineNumber", "Timer.tick:file.ts:lineNumber"]
+  },
+  "patterns_studied": {
+    "Redis": "Using RedisService.get() pattern from OrderService.ts:45, UserState.ts:89",
+    "WebSocket": "Following onConnect integration from UserStateManager.ts:123"
+  },
+  "integration_points": [
+    "Modified WebSocketServer.onConnect at line 234 to call getPendingNotifications",
+    "Added NotificationService.markAsDelivered call in message handler at line 567"
+  ],
+  "user_journey": "User connects → WebSocketServer.onConnect:234 → NotificationService.getPending:45 → ws.send:246 → markAsDelivered:250",
   "confidence": 8,
   "testing_notes": "How you verified it works",
   "commit_hash": "First 8 chars of commit",
@@ -319,6 +417,8 @@ Before marking ready_for_review=true:
   "ready_for_review": true
 }
 ```
+
+IMPORTANT: If call_graph has ANY empty arrays, you have orphaned code and MUST fix it before marking ready_for_review=true
 
 # SUCCESS CRITERIA
 
@@ -371,29 +471,88 @@ If reviewing broker-frontend code:
 - **UI Patterns**: Radix UI + Tailwind, GlobalDialogs for modals
 - **WebSocket Patterns**: Proper reconnection logic, component-specific subscriptions
 
+# ORPHAN CODE CHECK (MANDATORY - DO THIS FIRST)
+
+For EVERY new function/method in the diff, you MUST:
+1. Search for where it's called (grep -r "functionName")
+2. If NOT found anywhere → IMMEDIATE REJECTION
+3. Document the caller in your review
+
+Example:
+```
+New function: getNotificationsForUser()
+Searching for usage...
+✗ No calls found → REJECT: Orphan function with no caller
+```
+
+# REVERSE TRACE VERIFICATION
+
+Start from the user-facing outcome and trace backward through the code:
+```
+User sees notification ← 
+WebSocket sends message ← 
+Handler retrieves from storage ← 
+Connection event triggers handler ← 
+Is onConnect modified to call this?
+```
+If the chain is broken at ANY point → REJECT
+
+# PATTERN COMPLIANCE VERIFICATION
+
+1. Identify service pattern used (Redis, DB, WebSocket)
+2. Find 3+ existing examples of that pattern
+3. Verify new code matches EXACTLY
+4. Different pattern → REJECT
+
+Example:
+```
+New code: redis.get(key)
+Existing pattern: RedisService.get(key) (found in 15 files)
+✗ Pattern mismatch → REJECT
+```
+
+# INTEGRATION CHECKLIST FOR COMMON FEATURES
+
+## WebSocket Features MUST have:
+- [ ] Modified onConnect handler (for reconnection features)
+- [ ] Modified message handler (for new message types)
+- [ ] Modified onDisconnect (for cleanup)
+- [ ] All functions are called from these handlers
+
+## Background Task Features MUST have:
+- [ ] Error handler that stores notifications
+- [ ] Delivery mechanism when user is online
+- [ ] Cleanup after delivery
+
+## Storage Features MUST have:
+- [ ] Uses service layer (RedisService, DatabaseService)
+- [ ] Has TTL/expiry logic
+- [ ] Has cleanup mechanism
+
 # REVIEW PROCESS
 
-1. **Verify Task Completion**
-   - Does the implementation solve what was actually asked?
-   - Not what they think should be built, but what WAS requested
-   - Is it the minimal change that fully addresses the requirement?
+1. **Orphan Code Check** (FIRST PRIORITY)
+   - Check EVERY new function has a caller
+   - No caller = IMMEDIATE REJECTION
+   - Document where each function is called
 
-2. **Assess Implementation Quality**
-   - Is this a simple, robust solution?
-   - Could a junior developer understand and modify it?
-   - Does it follow the codebase's existing patterns exactly?
+2. **Verify Task Completion**
+   - List each requirement from the task
+   - Check if implemented (not just similar)
+   - Missing requirement = REJECTION
 
-3. **Check Code Hygiene**
-   - Zero tolerance for unused code
-   - Zero tolerance for TODO/FIXME comments
-   - All errors handled explicitly
-   - Descriptive naming throughout
-   - Code must be production-ready
+3. **Reverse Trace User Journey**
+   - Start from user outcome
+   - Trace back through entire flow
+   - Broken chain = REJECTION
 
-4. **Validate Production Readiness**
-   - Will this work reliably in production?
-   - Are edge cases handled?
-   - Is it appropriately robust (not over-engineered)?
+4. **Pattern Compliance**
+   - Compare with existing patterns
+   - Different pattern = REJECTION
+
+5. **Integration Verification**
+   - Check all integration points modified
+   - Missing integration = REJECTION
 
 # APPROVAL CRITERIA
 
@@ -431,11 +590,78 @@ After analyzing the git diff and implementation:
   "code_quality": "Clean code principles followed?",
   "pattern_compliance": "Matches existing codebase patterns?",
   "unused_code_check": "Any unused imports/variables/functions?",
+  "orphan_functions": {
+    "functionName": "Called by: ClassName.method:line or 'ORPHAN - NOT CALLED'",
+    "anotherFunction": "Called by: WebSocketServer.onConnect:234"
+  },
+  "integration_verification": {
+    "required_integration": "✓ or ✗ with explanation",
+    "onConnect_modified": "✓ Calls getPendingNotifications at line 234",
+    "cleanup_implemented": "✗ No cleanup on disconnect"
+  },
+  "reverse_trace": "User connects → WS.onConnect:234 → getPending:45 → send:246 → cleanup:250",
   "error_handling": "Explicit error handling with no silent failures?",
   "strengths": ["2-3 things done well"],
   "concerns": ["Critical issues if approval=false"],
   "suggested_fixes": ["Specific, actionable improvements if approval=false"],
   "confidence": 8
+}
+```
+
+IMPORTANT: If ANY function in orphan_functions shows "ORPHAN - NOT CALLED", you MUST set approval=false
+
+# CONCRETE REVIEW EXAMPLE
+
+## Task: "Send notifications when users reconnect"
+
+### REJECT Example:
+```json:review
+{
+  "approval": false,
+  "task_completion": "Partially - stores notifications but doesn't send on reconnect",
+  "orphan_functions": {
+    "getNotificationsForUser": "ORPHAN - NOT CALLED",
+    "markAsDelivered": "ORPHAN - NOT CALLED"
+  },
+  "integration_verification": {
+    "onConnect_modified": "✗ No modification to WebSocketServer.onConnect",
+    "delivery_mechanism": "✗ No code to send stored notifications"
+  },
+  "reverse_trace": "BROKEN: User connects → onConnect (not modified) → ✗ No notification retrieval",
+  "concerns": [
+    "Core requirement not met: notifications not sent on reconnect",
+    "Orphan functions indicate incomplete implementation",
+    "No integration with WebSocket connection logic"
+  ],
+  "suggested_fixes": [
+    "Modify WebSocketServer.onConnect to call getNotificationsForUser",
+    "Add code to send retrieved notifications via WebSocket",
+    "Implement markAsDelivered after successful send"
+  ]
+}
+```
+
+### APPROVE Example:
+```json:review
+{
+  "approval": true,
+  "task_completion": "Complete - notifications stored, retrieved, and sent on reconnect",
+  "orphan_functions": {
+    "storeNotification": "Called by: BackgroundTask.onError:145",
+    "getNotificationsForUser": "Called by: WebSocketServer.onConnect:234",
+    "markAsDelivered": "Called by: WebSocketServer.onConnect:246"
+  },
+  "integration_verification": {
+    "onConnect_modified": "✓ Calls getPendingNotifications at line 234",
+    "delivery_mechanism": "✓ Sends via ws.send at line 240",
+    "cleanup_implemented": "✓ Marks as delivered at line 246"
+  },
+  "reverse_trace": "User connects → WS.onConnect:234 → getPending:45 → ws.send:240 → markDelivered:246",
+  "strengths": [
+    "Complete end-to-end implementation",
+    "Follows RedisService pattern consistently",
+    "Proper cleanup after delivery"
+  ]
 }
 ```
 
@@ -447,6 +673,7 @@ Be firm but fair:
 - Demand clean code with zero unused elements
 - Ensure it matches what exists, not what could be
 - Focus on shipping working code, not perfect code
+- REJECT if ANY function is orphaned (not called)
 
 Remember: The implementer should have:
 1. Read the README to understand the app
@@ -454,6 +681,7 @@ Remember: The implementer should have:
 3. Built the simplest robust solution
 4. Removed all unused code
 5. Handled errors explicitly
+6. Integrated all functions (no orphans)
 
 Verify they did ALL of these."""
     
