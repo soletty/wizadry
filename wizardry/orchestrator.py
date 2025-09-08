@@ -2350,12 +2350,12 @@ REMEMBER:
 **CRITICAL**: You MUST provide your response in this exact format:
 
 ```json:implementation
-{
+{{
   "rationale": "Summary of what you fixed and changed",
   "files_modified": ["list", "of", "files", "changed"],
-  "patterns_followed": {"pattern": "explanation"},
-  "call_graph": {"function": ["caller1:file.ts:line"]},
-  "patterns_studied": {"Pattern": "How you studied existing code"},
+  "patterns_followed": {{"pattern": "explanation"}},
+  "call_graph": {{"function": ["caller1:file.ts:line"]}},
+  "patterns_studied": {{"Pattern": "How you studied existing code"}},
   "integration_points": ["How the code integrates"],
   "user_journey": ["Step by step user flow"],
   "confidence": 9,
@@ -2363,7 +2363,7 @@ REMEMBER:
   "commit_hash": "abc12345",
   "committed": true,
   "ready_for_review": true
-}
+}}
 ```
 """
                 
