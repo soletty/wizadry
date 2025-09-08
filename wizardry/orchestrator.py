@@ -2347,7 +2347,24 @@ REMEMBER:
 - Follow existing patterns exactly
 - NO TODO/FIXME comments
 
-Provide updated JSON implementation output when complete.
+**CRITICAL**: You MUST provide your response in this exact format:
+
+```json:implementation
+{
+  "rationale": "Summary of what you fixed and changed",
+  "files_modified": ["list", "of", "files", "changed"],
+  "patterns_followed": {"pattern": "explanation"},
+  "call_graph": {"function": ["caller1:file.ts:line"]},
+  "patterns_studied": {"Pattern": "How you studied existing code"},
+  "integration_points": ["How the code integrates"],
+  "user_journey": ["Step by step user flow"],
+  "confidence": 9,
+  "testing_notes": "How you verified the fixes",
+  "commit_hash": "abc12345",
+  "committed": true,
+  "ready_for_review": true
+}
+```
 """
                 
                 with console.status(f"🔧 Implementer fixing issues (iteration {iteration + 1})..."):
